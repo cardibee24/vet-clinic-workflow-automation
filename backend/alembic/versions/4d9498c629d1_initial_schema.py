@@ -19,10 +19,12 @@ down_revision: str | None = None
 branch_labels: Sequence[str] | None = None
 depends_on: Sequence[str] | None = None
 
-user_role = postgresql.ENUM("vet", "tech", "front_desk", "admin", name="user_role")
+user_role = postgresql.ENUM(
+    "vet", "tech", "front_desk", "admin", name="user_role", create_type=False
+)
 appointment_status = postgresql.ENUM(
     "scheduled", "checked_in", "in_progress", "completed", "cancelled", "no_show",
-    name="appointment_status",
+    name="appointment_status", create_type=False,
 )
 
 
