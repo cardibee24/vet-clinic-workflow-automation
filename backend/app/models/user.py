@@ -19,8 +19,14 @@ class User(Base, UUIDPKMixin, TimestampMixin, TenantScopedMixin):
 
     __tablename__ = "users"
 
-    email: Mapped[str] = mapped_column(nullable=False, index=True)
+    # Unique across all clinics (not just per-clinic): login takes only email +
+    # password with no clinic selector, so email is the sole key used to look up
+    # which clinic a user belongs to (see app/api/auth.py).
+    email: Mapped[str] = mapped_column(nullable=False, unique=True, index=True)
     hashed_password: Mapped[str] = mapped_column(nullable=False)
     full_name: Mapped[str] = mapped_column(nullable=False)
-    role: Mapped[UserRole] = mapped_column(Enum(UserRole, name="user_role"), nullable=False)
+    role: Mapped[UserRole] = mapped_column(
+        Enum(UserRole, name="user_role", values_callable=lambda enum_cls: [e.value for e in enum_cls]),
+        nullable=False,
+    )
     is_active: Mapped[bool] = mapped_column(default=True, server_default="true")

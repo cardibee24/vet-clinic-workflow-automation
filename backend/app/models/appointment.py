@@ -26,7 +26,11 @@ class Appointment(Base, UUIDPKMixin, TimestampMixin, TenantScopedMixin):
     scheduled_start: Mapped[datetime] = mapped_column(nullable=False)
     scheduled_end: Mapped[datetime] = mapped_column(nullable=False)
     status: Mapped[AppointmentStatus] = mapped_column(
-        Enum(AppointmentStatus, name="appointment_status"),
+        Enum(
+            AppointmentStatus,
+            name="appointment_status",
+            values_callable=lambda enum_cls: [e.value for e in enum_cls],
+        ),
         nullable=False,
         default=AppointmentStatus.SCHEDULED,
         server_default=AppointmentStatus.SCHEDULED.value,
