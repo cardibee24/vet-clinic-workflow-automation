@@ -9,9 +9,8 @@ from app.models.mixins import TenantScopedMixin, TimestampMixin, UUIDPKMixin
 
 class UserRole(str, enum.Enum):
     VET = "vet"
-    TECH = "tech"
-    FRONT_DESK = "front_desk"
-    ADMIN = "admin"
+    # Clinic owner/manager staff role - unrelated to the Owner model (pet-owning clients).
+    OWNER = "owner"
 
 
 class User(Base, UUIDPKMixin, TimestampMixin, TenantScopedMixin):

@@ -1,73 +1,70 @@
 import { useState, type FormEvent } from "react";
-import { fetchCurrentUser, login, type CurrentUser } from "../api/auth";
-
-type State =
-  | { status: "logged-out" }
-  | { status: "logging-in" }
-  | { status: "logged-in"; user: CurrentUser }
-  | { status: "error"; message: string };
+import { Navigate, useNavigate } from "react-router-dom";
+import { useAuth } from "../auth/AuthContext";
+import { HealthCheckPage } from "./HealthCheckPage";
 
 export function LoginPage() {
+  const { state, login } = useAuth();
+  const navigate = useNavigate();
+
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
-  const [state, setState] = useState<State>({ status: "logged-out" });
+  const [submitting, setSubmitting] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  if (state.status === "loading") {
+    return <p style={{ padding: 24 }}>Loading...</p>;
+  }
+  if (state.status === "signed-in") {
+    return <Navigate to="/owners" replace />;
+  }
 
   async function handleSubmit(event: FormEvent) {
     event.preventDefault();
-    setState({ status: "logging-in" });
+    setSubmitting(true);
+    setError(null);
     try {
-      const token = await login(email, password);
-      const user = await fetchCurrentUser(token.access_token);
-      setState({ status: "logged-in", user });
-    } catch (error) {
-      setState({
-        status: "error",
-        message: error instanceof Error ? error.message : "Login failed",
-      });
+      await login(email, password);
+      navigate("/owners");
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Login failed");
+    } finally {
+      setSubmitting(false);
     }
   }
 
-  if (state.status === "logged-in") {
-    return (
-      <section>
-        <h2>Signed in</h2>
-        <pre>{JSON.stringify(state.user, null, 2)}</pre>
-        <button type="button" onClick={() => setState({ status: "logged-out" })}>
-          Log out
-        </button>
-      </section>
-    );
-  }
-
   return (
-    <section>
-      <h2>Staff login</h2>
-      <form onSubmit={handleSubmit}>
-        <div>
-          <label htmlFor="email">Email</label>
-          <input
-            id="email"
-            type="email"
-            value={email}
-            onChange={(event) => setEmail(event.target.value)}
-            required
-          />
-        </div>
-        <div>
-          <label htmlFor="password">Password</label>
-          <input
-            id="password"
-            type="password"
-            value={password}
-            onChange={(event) => setPassword(event.target.value)}
-            required
-          />
-        </div>
-        <button type="submit" disabled={state.status === "logging-in"}>
-          {state.status === "logging-in" ? "Signing in..." : "Sign in"}
-        </button>
-      </form>
-      {state.status === "error" && <p style={{ color: "red" }}>{state.message}</p>}
-    </section>
+    <>
+      <HealthCheckPage />
+      <section style={{ maxWidth: 360, margin: "0 auto", padding: 24, textAlign: "left" }}>
+        <h2>Staff login</h2>
+        <form onSubmit={handleSubmit}>
+          <div className="field">
+            <label htmlFor="email">Email</label>
+            <input
+              id="email"
+              type="email"
+              value={email}
+              onChange={(event) => setEmail(event.target.value)}
+              required
+            />
+          </div>
+          <div className="field" style={{ marginTop: 12 }}>
+            <label htmlFor="password">Password</label>
+            <input
+              id="password"
+              type="password"
+              value={password}
+              onChange={(event) => setPassword(event.target.value)}
+              required
+            />
+          </div>
+          <button type="submit" disabled={submitting} style={{ marginTop: 16 }}>
+            {submitting ? "Signing in..." : "Sign in"}
+          </button>
+        </form>
+        {error && <p className="error-text">{error}</p>}
+      </section>
+    </>
   );
 }
