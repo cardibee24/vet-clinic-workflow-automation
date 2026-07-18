@@ -2,7 +2,6 @@ import { apiFetch } from "./client";
 
 export interface Pet {
   id: string;
-  clinic_id: string;
   owner_id: string;
   name: string;
   species: string;
@@ -19,7 +18,6 @@ export interface PetCreateInput {
 
 export interface Owner {
   id: string;
-  clinic_id: string;
   first_name: string;
   last_name: string;
   email: string | null;
@@ -51,4 +49,8 @@ export function getOwner(token: string, ownerId: string): Promise<OwnerWithPets>
 
 export function addPet(token: string, ownerId: string, body: PetCreateInput): Promise<Pet> {
   return apiFetch(`/api/owners/${ownerId}/pets`, { method: "POST", token, body });
+}
+
+export function deleteOwner(token: string, ownerId: string): Promise<void> {
+  return apiFetch(`/api/owners/${ownerId}`, { method: "DELETE", token });
 }

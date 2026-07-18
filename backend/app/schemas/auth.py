@@ -17,7 +17,6 @@ class Token(BaseModel):
 
 class UserOut(BaseModel):
     id: uuid.UUID
-    clinic_id: uuid.UUID
     email: str
     full_name: str
     role: UserRole

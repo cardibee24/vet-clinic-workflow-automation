@@ -1,10 +1,10 @@
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.db.base_class import Base
-from app.models.mixins import TenantScopedMixin, TimestampMixin, UUIDPKMixin
+from app.models.mixins import TimestampMixin, UUIDPKMixin
 
 
-class Owner(Base, UUIDPKMixin, TimestampMixin, TenantScopedMixin):
+class Owner(Base, UUIDPKMixin, TimestampMixin):
     """A pet owner / client of a clinic."""
 
     __tablename__ = "owners"

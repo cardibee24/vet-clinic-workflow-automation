@@ -1,7 +1,7 @@
 import { useEffect, useState, type FormEvent } from "react";
 import { Link } from "react-router-dom";
 import { useToken } from "../auth/AuthContext";
-import { createOwner, listOwners, type Owner } from "../api/owners";
+import { createOwner, deleteOwner, listOwners, type Owner } from "../api/owners";
 
 export function OwnersPage() {
   const token = useToken();
@@ -16,6 +16,8 @@ export function OwnersPage() {
   const [phone, setPhone] = useState("");
   const [submitting, setSubmitting] = useState(false);
   const [formError, setFormError] = useState<string | null>(null);
+  const [deleteError, setDeleteError] = useState<string | null>(null);
+  const [deletingId, setDeletingId] = useState<string | null>(null);
 
   function refresh() {
     setLoading(true);
@@ -53,6 +55,22 @@ export function OwnersPage() {
     }
   }
 
+  async function handleDelete(owner: Owner) {
+    if (!window.confirm(`Delete ${owner.first_name} ${owner.last_name}? This cannot be undone.`)) {
+      return;
+    }
+    setDeletingId(owner.id);
+    setDeleteError(null);
+    try {
+      await deleteOwner(token, owner.id);
+      refresh();
+    } catch (error) {
+      setDeleteError(error instanceof Error ? error.message : "Failed to delete owner");
+    } finally {
+      setDeletingId(null);
+    }
+  }
+
   return (
     <section>
       <h2>Owners</h2>
@@ -84,6 +102,7 @@ export function OwnersPage() {
 
       {loading && <p>Loading owners...</p>}
       {loadError && <p className="error-text">{loadError}</p>}
+      {deleteError && <p className="error-text">{deleteError}</p>}
       {!loading && !loadError && (
         <table>
           <thead>
@@ -103,7 +122,17 @@ export function OwnersPage() {
                 <td>{owner.email ?? "—"}</td>
                 <td>{owner.phone ?? "—"}</td>
                 <td>
-                  <Link to={`/owners/${owner.id}`}>View</Link>
+                  <div className="actions">
+                    <Link to={`/owners/${owner.id}`}>View</Link>
+                    <button
+                      type="button"
+                      className="secondary"
+                      disabled={deletingId === owner.id}
+                      onClick={() => handleDelete(owner)}
+                    >
+                      {deletingId === owner.id ? "Deleting..." : "Delete"}
+                    </button>
+                  </div>
                 </td>
               </tr>
             ))}

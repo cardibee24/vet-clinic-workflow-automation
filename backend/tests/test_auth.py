@@ -1,8 +1,3 @@
-import uuid
-
-from app.core.security import create_access_token
-
-
 def test_login_success(client, user):
     response = client.post("/api/auth/login", json={"email": user.email, "password": "hunter2"})
     assert response.status_code == 200
@@ -38,7 +33,7 @@ def test_me_rejects_garbage_token(client):
     assert response.status_code == 401
 
 
-def test_me_returns_current_user_scoped_to_own_clinic(client, user):
+def test_me_returns_current_user(client, user):
     login = client.post("/api/auth/login", json={"email": user.email, "password": "hunter2"})
     token = login.json()["access_token"]
 
@@ -46,12 +41,4 @@ def test_me_returns_current_user_scoped_to_own_clinic(client, user):
     assert response.status_code == 200
     body = response.json()
     assert body["email"] == user.email
-    assert body["clinic_id"] == str(user.clinic_id)
-
-
-def test_me_rejects_token_with_mismatched_clinic_id(client, user):
-    # Same user id, but a clinic_id claim that doesn't match the user's real
-    # clinic (e.g. a forged/tampered token) - the scoped() lookup must miss.
-    forged_token = create_access_token(user_id=user.id, clinic_id=uuid.uuid4())
-    response = client.get("/api/auth/me", headers={"Authorization": f"Bearer {forged_token}"})
-    assert response.status_code == 401
+    assert body["id"] == str(user.id)

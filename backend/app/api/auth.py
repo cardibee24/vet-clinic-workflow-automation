@@ -13,12 +13,6 @@ router = APIRouter()
 
 @router.post("/login", response_model=Token)
 def login(body: LoginRequest, db: Session = Depends(get_db)) -> Token:
-    # Login has no clinic selector - email is the only key we have, so this is
-    # the one lookup on a tenant-scoped table that can't take clinic_id as an
-    # argument (see app/core/tenancy.py). email is unique across all clinics
-    # (app/models/user.py) precisely so this stays unambiguous; every endpoint
-    # after this one derives clinic_id from the token this issues, never again
-    # from a bare email lookup.
     user = db.execute(select(User).where(User.email == body.email)).scalar_one_or_none()
 
     invalid_credentials = HTTPException(
@@ -30,7 +24,7 @@ def login(body: LoginRequest, db: Session = Depends(get_db)) -> Token:
     if not verify_password(body.password, user.hashed_password):
         raise invalid_credentials
 
-    access_token = create_access_token(user_id=user.id, clinic_id=user.clinic_id)
+    access_token = create_access_token(user_id=user.id)
     return Token(access_token=access_token)
 
 

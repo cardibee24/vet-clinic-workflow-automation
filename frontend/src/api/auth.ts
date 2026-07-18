@@ -7,7 +7,6 @@ export interface Token {
 
 export interface CurrentUser {
   id: string;
-  clinic_id: string;
   email: string;
   full_name: string;
   role: string;

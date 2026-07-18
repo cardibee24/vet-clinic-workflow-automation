@@ -2,6 +2,7 @@ import { useEffect, useState, type FormEvent } from "react";
 import { Link, useParams } from "react-router-dom";
 import { useToken } from "../auth/AuthContext";
 import { addPet, getOwner, type OwnerWithPets } from "../api/owners";
+import { deletePet } from "../api/pets";
 
 export function OwnerDetailPage() {
   const token = useToken();
@@ -17,6 +18,8 @@ export function OwnerDetailPage() {
   const [dateOfBirth, setDateOfBirth] = useState("");
   const [submitting, setSubmitting] = useState(false);
   const [formError, setFormError] = useState<string | null>(null);
+  const [deleteError, setDeleteError] = useState<string | null>(null);
+  const [deletingPetId, setDeletingPetId] = useState<string | null>(null);
 
   function refresh() {
     if (!ownerId) return;
@@ -56,6 +59,22 @@ export function OwnerDetailPage() {
     }
   }
 
+  async function handleDeletePet(pet: OwnerWithPets["pets"][number]) {
+    if (!window.confirm(`Delete ${pet.name}? This cannot be undone.`)) {
+      return;
+    }
+    setDeletingPetId(pet.id);
+    setDeleteError(null);
+    try {
+      await deletePet(token, pet.id);
+      refresh();
+    } catch (error) {
+      setDeleteError(error instanceof Error ? error.message : "Failed to delete pet");
+    } finally {
+      setDeletingPetId(null);
+    }
+  }
+
   if (loading) return <p>Loading owner...</p>;
   if (loadError) return <p className="error-text">{loadError}</p>;
   if (!owner) return null;
@@ -73,6 +92,7 @@ export function OwnerDetailPage() {
       </p>
 
       <h3>Pets</h3>
+      {deleteError && <p className="error-text">{deleteError}</p>}
       <table>
         <thead>
           <tr>
@@ -80,6 +100,7 @@ export function OwnerDetailPage() {
             <th>Species</th>
             <th>Breed</th>
             <th>Date of birth</th>
+            <th></th>
           </tr>
         </thead>
         <tbody>
@@ -89,11 +110,21 @@ export function OwnerDetailPage() {
               <td>{pet.species}</td>
               <td>{pet.breed ?? "—"}</td>
               <td>{pet.date_of_birth ?? "—"}</td>
+              <td>
+                <button
+                  type="button"
+                  className="secondary"
+                  disabled={deletingPetId === pet.id}
+                  onClick={() => handleDeletePet(pet)}
+                >
+                  {deletingPetId === pet.id ? "Deleting..." : "Delete"}
+                </button>
+              </td>
             </tr>
           ))}
           {owner.pets.length === 0 && (
             <tr>
-              <td colSpan={4} className="muted">
+              <td colSpan={5} className="muted">
                 No pets yet.
               </td>
             </tr>

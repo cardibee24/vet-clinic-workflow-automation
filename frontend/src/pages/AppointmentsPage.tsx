@@ -1,6 +1,12 @@
 import { useState, type FormEvent } from "react";
+import { Link } from "react-router-dom";
 import { useToken } from "../auth/AuthContext";
-import { createAppointment, updateAppointmentStatus, type AppointmentStatus } from "../api/appointments";
+import {
+  createAppointment,
+  deleteAppointment,
+  updateAppointmentStatus,
+  type AppointmentStatus,
+} from "../api/appointments";
 import { useAppointmentDirectory } from "../hooks/useAppointmentDirectory";
 import { usePetDirectory } from "../hooks/usePetDirectory";
 import { formatDateTime } from "../lib/format";
@@ -29,12 +35,12 @@ export function AppointmentsPage() {
   const petDirectory = usePetDirectory(token);
 
   const [petId, setPetId] = useState("");
-  const [scheduledStart, setScheduledStart] = useState("");
-  const [scheduledEnd, setScheduledEnd] = useState("");
+  const [scheduledAt, setScheduledAt] = useState("");
   const [reason, setReason] = useState("");
   const [submitting, setSubmitting] = useState(false);
   const [formError, setFormError] = useState<string | null>(null);
   const [actionError, setActionError] = useState<string | null>(null);
+  const [deletingId, setDeletingId] = useState<string | null>(null);
 
   async function handleSubmit(event: FormEvent) {
     event.preventDefault();
@@ -43,13 +49,11 @@ export function AppointmentsPage() {
     try {
       await createAppointment(token, {
         pet_id: petId,
-        scheduled_start: scheduledStart,
-        scheduled_end: scheduledEnd,
+        scheduled_at: scheduledAt,
         reason: reason || undefined,
       });
       setPetId("");
-      setScheduledStart("");
-      setScheduledEnd("");
+      setScheduledAt("");
       setReason("");
       refresh();
     } catch (err) {
@@ -66,6 +70,22 @@ export function AppointmentsPage() {
       refresh();
     } catch (err) {
       setActionError(err instanceof Error ? err.message : "Failed to update appointment");
+    }
+  }
+
+  async function handleDelete(appointmentId: string) {
+    if (!window.confirm("Delete this appointment? This cannot be undone.")) {
+      return;
+    }
+    setDeletingId(appointmentId);
+    setActionError(null);
+    try {
+      await deleteAppointment(token, appointmentId);
+      refresh();
+    } catch (err) {
+      setActionError(err instanceof Error ? err.message : "Failed to delete appointment");
+    } finally {
+      setDeletingId(null);
     }
   }
 
@@ -89,22 +109,12 @@ export function AppointmentsPage() {
             </select>
           </div>
           <div className="field">
-            <label htmlFor="scheduled_start">Start</label>
+            <label htmlFor="scheduled_at">Date &amp; time</label>
             <input
-              id="scheduled_start"
+              id="scheduled_at"
               type="datetime-local"
-              value={scheduledStart}
-              onChange={(e) => setScheduledStart(e.target.value)}
-              required
-            />
-          </div>
-          <div className="field">
-            <label htmlFor="scheduled_end">End</label>
-            <input
-              id="scheduled_end"
-              type="datetime-local"
-              value={scheduledEnd}
-              onChange={(e) => setScheduledEnd(e.target.value)}
+              value={scheduledAt}
+              onChange={(e) => setScheduledAt(e.target.value)}
               required
             />
           </div>
@@ -131,8 +141,7 @@ export function AppointmentsPage() {
             <tr>
               <th>Pet</th>
               <th>Owner</th>
-              <th>Start</th>
-              <th>End</th>
+              <th>Date &amp; time</th>
               <th>Status</th>
               <th>Reason</th>
               <th></th>
@@ -143,8 +152,7 @@ export function AppointmentsPage() {
               <tr key={appointment.id}>
                 <td>{appointment.petName}</td>
                 <td>{appointment.ownerName}</td>
-                <td>{formatDateTime(appointment.scheduled_start)}</td>
-                <td>{formatDateTime(appointment.scheduled_end)}</td>
+                <td>{formatDateTime(appointment.scheduled_at)}</td>
                 <td>
                   <span className="status-pill">{STATUS_LABELS[appointment.status]}</span>
                 </td>
@@ -161,13 +169,24 @@ export function AppointmentsPage() {
                         {STATUS_LABELS[next]}
                       </button>
                     ))}
+                    <Link to={`/check-queue/${appointment.id}`} target="_blank" rel="noreferrer">
+                      Queue link
+                    </Link>
+                    <button
+                      type="button"
+                      className="secondary"
+                      disabled={deletingId === appointment.id}
+                      onClick={() => handleDelete(appointment.id)}
+                    >
+                      {deletingId === appointment.id ? "Deleting..." : "Delete"}
+                    </button>
                   </div>
                 </td>
               </tr>
             ))}
             {appointments.length === 0 && (
               <tr>
-                <td colSpan={7} className="muted">
+                <td colSpan={6} className="muted">
                   No appointments yet.
                 </td>
               </tr>

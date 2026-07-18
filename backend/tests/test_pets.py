@@ -1,9 +1,7 @@
-import pytest
+import uuid
+from datetime import datetime
 
-from app.core.security import hash_password
-from app.models.clinic import Clinic
-from app.models.owner import Owner
-from app.models.user import User, UserRole
+import pytest
 
 
 @pytest.fixture()
@@ -14,24 +12,17 @@ def auth_headers(client, user):
 
 
 @pytest.fixture()
-def other_clinic_headers(client, db_session):
-    other_clinic = Clinic(name="Other Clinic")
-    db_session.add(other_clinic)
-    db_session.flush()
-
-    other_user = User(
-        clinic_id=other_clinic.id,
-        email="other-vet@example.com",
-        hashed_password=hash_password("hunter2"),
-        full_name="Dr. Other",
-        role=UserRole.VET,
+def pet(client, auth_headers):
+    create_owner = client.post(
+        "/api/owners", json={"first_name": "Jane", "last_name": "Doe"}, headers=auth_headers
     )
-    db_session.add(other_user)
-    db_session.flush()
-
-    login = client.post("/api/auth/login", json={"email": other_user.email, "password": "hunter2"})
-    token = login.json()["access_token"]
-    return {"Authorization": f"Bearer {token}"}
+    owner_id = create_owner.json()["id"]
+    create_pet = client.post(
+        f"/api/owners/{owner_id}/pets",
+        json={"name": "Rex", "species": "dog"},
+        headers=auth_headers,
+    )
+    return create_pet.json()
 
 
 def test_list_pets_requires_auth(client):
@@ -39,36 +30,37 @@ def test_list_pets_requires_auth(client):
     assert response.status_code == 401
 
 
-def test_list_pets_scoped_to_clinic(client, auth_headers, user):
-    create_owner = client.post(
-        "/api/owners", json={"first_name": "Jane", "last_name": "Doe"}, headers=auth_headers
-    )
-    owner_id = create_owner.json()["id"]
-    client.post(
-        f"/api/owners/{owner_id}/pets",
-        json={"name": "Rex", "species": "dog"},
-        headers=auth_headers,
-    )
-
+def test_list_pets(client, auth_headers, pet):
     response = client.get("/api/pets", headers=auth_headers)
     assert response.status_code == 200
     body = response.json()
-    assert len(body) == 1
-    assert body[0]["name"] == "Rex"
-    assert body[0]["clinic_id"] == str(user.clinic_id)
+    assert pet["id"] in [p["id"] for p in body]
 
 
-def test_list_pets_excludes_other_clinics(client, auth_headers, other_clinic_headers):
-    create_owner = client.post(
-        "/api/owners", json={"first_name": "Other", "last_name": "Owner"}, headers=other_clinic_headers
-    )
-    owner_id = create_owner.json()["id"]
-    client.post(
-        f"/api/owners/{owner_id}/pets",
-        json={"name": "Fido", "species": "dog"},
-        headers=other_clinic_headers,
-    )
+def test_delete_pet_without_appointments_succeeds(client, auth_headers, pet):
+    response = client.delete(f"/api/pets/{pet['id']}", headers=auth_headers)
+    assert response.status_code == 204
 
     response = client.get("/api/pets", headers=auth_headers)
-    assert response.status_code == 200
-    assert response.json() == []
+    assert pet["id"] not in [p["id"] for p in response.json()]
+
+
+def test_delete_pet_requires_auth(client, pet):
+    response = client.delete(f"/api/pets/{pet['id']}")
+    assert response.status_code == 401
+
+
+def test_delete_pet_not_found(client, auth_headers):
+    response = client.delete(f"/api/pets/{uuid.uuid4()}", headers=auth_headers)
+    assert response.status_code == 404
+
+
+def test_delete_pet_blocked_by_existing_appointment(client, auth_headers, pet):
+    client.post(
+        "/api/appointments",
+        json={"pet_id": pet["id"], "scheduled_at": datetime(2026, 8, 1, 9, 0, 0).isoformat()},
+        headers=auth_headers,
+    )
+
+    response = client.delete(f"/api/pets/{pet['id']}", headers=auth_headers)
+    assert response.status_code == 409

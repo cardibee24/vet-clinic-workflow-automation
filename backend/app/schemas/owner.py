@@ -14,7 +14,6 @@ class OwnerCreate(BaseModel):
 
 class OwnerOut(BaseModel):
     id: uuid.UUID
-    clinic_id: uuid.UUID
     first_name: str
     last_name: str
     email: str | None

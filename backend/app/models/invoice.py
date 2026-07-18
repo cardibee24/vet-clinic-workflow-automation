@@ -6,7 +6,7 @@ from sqlalchemy import Enum, ForeignKey
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.db.base_class import Base
-from app.models.mixins import TenantScopedMixin, TimestampMixin, UUIDPKMixin
+from app.models.mixins import TimestampMixin, UUIDPKMixin
 
 
 class InvoiceStatus(str, enum.Enum):
@@ -16,7 +16,7 @@ class InvoiceStatus(str, enum.Enum):
     VOID = "void"
 
 
-class Invoice(Base, UUIDPKMixin, TimestampMixin, TenantScopedMixin):
+class Invoice(Base, UUIDPKMixin, TimestampMixin):
     __tablename__ = "invoices"
 
     owner_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("owners.id"), nullable=False, index=True)
@@ -36,7 +36,7 @@ class Invoice(Base, UUIDPKMixin, TimestampMixin, TenantScopedMixin):
     notes: Mapped[str | None] = mapped_column(nullable=True)
 
 
-class InvoiceLineItem(Base, UUIDPKMixin, TimestampMixin, TenantScopedMixin):
+class InvoiceLineItem(Base, UUIDPKMixin, TimestampMixin):
     __tablename__ = "invoice_line_items"
 
     invoice_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("invoices.id"), nullable=False, index=True)

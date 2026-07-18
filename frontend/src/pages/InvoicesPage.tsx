@@ -106,7 +106,7 @@ export function InvoicesPage() {
               <option value="">No appointment</option>
               {appointmentsForOwner.map((appointment) => (
                 <option key={appointment.id} value={appointment.id}>
-                  {appointment.petName} — {appointment.scheduled_start.replace("T", " ")}
+                  {appointment.petName} — {appointment.scheduled_at.replace("T", " ")}
                 </option>
               ))}
             </select>

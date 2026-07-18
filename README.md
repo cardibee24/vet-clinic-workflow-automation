@@ -1,16 +1,12 @@
 # Vet Clinic Workflow Automation
 
-Multi-clinic SaaS for vet clinic workflow automation (scheduling, records, reminders, billing). This is currently a bare scaffold: a runnable skeleton with no business logic yet, used as the foundation for future feature work.
+A single-clinic app for vet clinic workflow automation (scheduling, records, billing).
 
 ## Stack
 
 - Backend: Python 3.13 + FastAPI, SQLAlchemy 2.0 + Alembic, PostgreSQL
 - Frontend: React + TypeScript (Vite)
 - Local infra: Docker Compose (Postgres + Redis)
-
-## Multi-tenancy convention
-
-Every clinic's data lives in the same schema, scoped by a `clinic_id` column. Any model holding per-clinic data uses `TenantScopedMixin` (`backend/app/models/mixins.py`). Any repository/service function reading or writing such a table **must** take `clinic_id` as an explicit, mandatory argument and apply it via `scoped()` (`backend/app/core/tenancy.py`) — never infer the current clinic implicitly. This is enforced by convention/review today, not by Postgres row-level security.
 
 ## Prerequisites
 
@@ -69,9 +65,9 @@ Verify: open http://localhost:5173 — should show a "Backend health check" page
 backend/
   app/
     api/        # FastAPI routers
-    core/       # cross-cutting conventions (tenancy scoping)
+    core/       # cross-cutting conventions (auth deps, security)
     db/         # SQLAlchemy base/session
-    models/     # ORM models (clinics, users, owners, pets, appointments)
+    models/     # ORM models (users, owners, pets, appointments, invoices)
     config.py   # pydantic-settings
     main.py     # FastAPI app entrypoint
   alembic/      # migrations

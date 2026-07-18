@@ -14,7 +14,6 @@ class LineItemCreate(BaseModel):
 
 class LineItemOut(BaseModel):
     id: uuid.UUID
-    clinic_id: uuid.UUID
     invoice_id: uuid.UUID
     description: str
     quantity: int
@@ -37,7 +36,6 @@ class InvoiceCreate(BaseModel):
 
 class InvoiceOut(BaseModel):
     id: uuid.UUID
-    clinic_id: uuid.UUID
     owner_id: uuid.UUID
     appointment_id: uuid.UUID | None
     status: InvoiceStatus

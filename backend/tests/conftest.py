@@ -5,7 +5,6 @@ from sqlalchemy.orm import sessionmaker
 from app.core.security import hash_password
 from app.db.session import engine, get_db
 from app.main import app
-from app.models.clinic import Clinic
 from app.models.user import User, UserRole
 
 
@@ -35,17 +34,8 @@ def client(db_session):
 
 
 @pytest.fixture()
-def clinic(db_session):
-    obj = Clinic(name="Test Clinic")
-    db_session.add(obj)
-    db_session.flush()
-    return obj
-
-
-@pytest.fixture()
-def user(db_session, clinic):
+def user(db_session):
     obj = User(
-        clinic_id=clinic.id,
         email="vet@example.com",
         hashed_password=hash_password("hunter2"),
         full_name="Dr. Vet",

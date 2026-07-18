@@ -5,10 +5,10 @@ from sqlalchemy import ForeignKey
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.db.base_class import Base
-from app.models.mixins import TenantScopedMixin, TimestampMixin, UUIDPKMixin
+from app.models.mixins import TimestampMixin, UUIDPKMixin
 
 
-class Pet(Base, UUIDPKMixin, TimestampMixin, TenantScopedMixin):
+class Pet(Base, UUIDPKMixin, TimestampMixin):
     __tablename__ = "pets"
 
     owner_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("owners.id"), nullable=False, index=True)

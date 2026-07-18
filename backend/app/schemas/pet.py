@@ -13,7 +13,6 @@ class PetCreate(BaseModel):
 
 class PetOut(BaseModel):
     id: uuid.UUID
-    clinic_id: uuid.UUID
     owner_id: uuid.UUID
     name: str
     species: str

@@ -4,7 +4,6 @@ export type InvoiceStatus = "draft" | "issued" | "paid" | "void";
 
 export interface LineItem {
   id: string;
-  clinic_id: string;
   invoice_id: string;
   description: string;
   quantity: number;
@@ -20,7 +19,6 @@ export interface LineItemCreateInput {
 
 export interface Invoice {
   id: string;
-  clinic_id: string;
   owner_id: string;
   appointment_id: string | null;
   status: InvoiceStatus;

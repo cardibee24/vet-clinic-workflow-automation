@@ -14,11 +14,11 @@ export function Layout() {
         <NavLink to="/appointments" className={({ isActive }) => (isActive ? "active" : undefined)}>
           Appointments
         </NavLink>
-        <NavLink to="/reminders" className={({ isActive }) => (isActive ? "active" : undefined)}>
-          Reminders
-        </NavLink>
         <NavLink to="/invoices" className={({ isActive }) => (isActive ? "active" : undefined)}>
           Invoices
+        </NavLink>
+        <NavLink to="/queue" className={({ isActive }) => (isActive ? "active" : undefined)}>
+          Queue
         </NavLink>
         <span className="spacer" />
         {user && <span className="muted">{user.full_name}</span>}
