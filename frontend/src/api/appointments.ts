@@ -45,12 +45,26 @@ export interface AppointmentCreateInput {
   reason?: string;
 }
 
+export interface AppointmentUpdateInput {
+  scheduled_at?: string;
+  reason?: string;
+  assigned_user_id?: string;
+}
+
 export function listAppointments(token: string): Promise<Appointment[]> {
   return apiFetch("/api/appointments", { token });
 }
 
 export function createAppointment(token: string, body: AppointmentCreateInput): Promise<Appointment> {
   return apiFetch("/api/appointments", { method: "POST", token, body });
+}
+
+export function updateAppointment(
+  token: string,
+  appointmentId: string,
+  body: AppointmentUpdateInput,
+): Promise<Appointment> {
+  return apiFetch(`/api/appointments/${appointmentId}`, { method: "PATCH", token, body });
 }
 
 export function updateAppointmentStatus(

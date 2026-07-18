@@ -25,6 +25,12 @@ class AppointmentOut(BaseModel):
     model_config = {"from_attributes": True}
 
 
+class AppointmentUpdate(BaseModel):
+    scheduled_at: datetime | None = None
+    reason: str | None = None
+    assigned_user_id: uuid.UUID | None = None
+
+
 class AppointmentStatusUpdate(BaseModel):
     status: AppointmentStatus
 

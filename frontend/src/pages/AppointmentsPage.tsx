@@ -4,6 +4,7 @@ import { useToken } from "../auth/AuthContext";
 import {
   createAppointment,
   deleteAppointment,
+  updateAppointment,
   updateAppointmentStatus,
   type AppointmentStatus,
 } from "../api/appointments";
@@ -19,6 +20,8 @@ const ALLOWED_TRANSITIONS: Record<AppointmentStatus, AppointmentStatus[]> = {
   cancelled: [],
   no_show: [],
 };
+
+const TERMINAL_STATUSES: AppointmentStatus[] = ["completed", "cancelled", "no_show"];
 
 const STATUS_LABELS: Record<AppointmentStatus, string> = {
   scheduled: "Scheduled",
@@ -41,6 +44,22 @@ export function AppointmentsPage() {
   const [formError, setFormError] = useState<string | null>(null);
   const [actionError, setActionError] = useState<string | null>(null);
   const [deletingId, setDeletingId] = useState<string | null>(null);
+
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [editScheduledAt, setEditScheduledAt] = useState("");
+  const [editReason, setEditReason] = useState("");
+  const [savingEdit, setSavingEdit] = useState(false);
+
+  const [search, setSearch] = useState("");
+  const [statusFilter, setStatusFilter] = useState<AppointmentStatus | "all">("all");
+  const query = search.trim().toLowerCase();
+  const visibleAppointments = appointments.filter((appointment) => {
+    if (statusFilter !== "all" && appointment.status !== statusFilter) return false;
+    if (!query) return true;
+    return [appointment.petName, appointment.ownerName, appointment.reason].some((field) =>
+      field?.toLowerCase().includes(query),
+    );
+  });
 
   async function handleSubmit(event: FormEvent) {
     event.preventDefault();
@@ -86,6 +105,34 @@ export function AppointmentsPage() {
       setActionError(err instanceof Error ? err.message : "Failed to delete appointment");
     } finally {
       setDeletingId(null);
+    }
+  }
+
+  function startEdit(appointmentId: string, scheduledAtValue: string, reasonValue: string | null) {
+    setActionError(null);
+    setEditingId(appointmentId);
+    setEditScheduledAt(scheduledAtValue.slice(0, 16));
+    setEditReason(reasonValue ?? "");
+  }
+
+  function cancelEdit() {
+    setEditingId(null);
+  }
+
+  async function saveEdit(appointmentId: string) {
+    setSavingEdit(true);
+    setActionError(null);
+    try {
+      await updateAppointment(token, appointmentId, {
+        scheduled_at: editScheduledAt,
+        reason: editReason || undefined,
+      });
+      cancelEdit();
+      refresh();
+    } catch (err) {
+      setActionError(err instanceof Error ? err.message : "Failed to update appointment");
+    } finally {
+      setSavingEdit(false);
     }
   }
 
@@ -136,63 +183,130 @@ export function AppointmentsPage() {
       {error && <p className="error-text">{error}</p>}
       {actionError && <p className="error-text">{actionError}</p>}
       {!loading && !error && (
-        <table>
-          <thead>
-            <tr>
-              <th>Pet</th>
-              <th>Owner</th>
-              <th>Date &amp; time</th>
-              <th>Status</th>
-              <th>Reason</th>
-              <th></th>
-            </tr>
-          </thead>
-          <tbody>
-            {appointments.map((appointment) => (
-              <tr key={appointment.id}>
-                <td>{appointment.petName}</td>
-                <td>{appointment.ownerName}</td>
-                <td>{formatDateTime(appointment.scheduled_at)}</td>
-                <td>
-                  <span className="status-pill">{STATUS_LABELS[appointment.status]}</span>
-                </td>
-                <td>{appointment.reason ?? "—"}</td>
-                <td>
-                  <div className="actions">
-                    {ALLOWED_TRANSITIONS[appointment.status].map((next) => (
+        <>
+          <div className="form-grid" style={{ marginBottom: 12, maxWidth: 480 }}>
+            <div className="field">
+              <label htmlFor="appointment_search">Search</label>
+              <input
+                id="appointment_search"
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+                placeholder="Pet, owner, or reason"
+              />
+            </div>
+            <div className="field">
+              <label htmlFor="status_filter">Status</label>
+              <select
+                id="status_filter"
+                value={statusFilter}
+                onChange={(e) => setStatusFilter(e.target.value as AppointmentStatus | "all")}
+              >
+                <option value="all">All</option>
+                {Object.entries(STATUS_LABELS).map(([value, label]) => (
+                  <option key={value} value={value}>
+                    {label}
+                  </option>
+                ))}
+              </select>
+            </div>
+          </div>
+          <table>
+            <thead>
+              <tr>
+                <th>Pet</th>
+                <th>Owner</th>
+                <th>Date &amp; time</th>
+                <th>Status</th>
+                <th>Reason</th>
+                <th></th>
+              </tr>
+            </thead>
+            <tbody>
+            {visibleAppointments.map((appointment) =>
+              editingId === appointment.id ? (
+                <tr key={appointment.id}>
+                  <td>{appointment.petName}</td>
+                  <td>{appointment.ownerName}</td>
+                  <td>
+                    <input
+                      type="datetime-local"
+                      value={editScheduledAt}
+                      onChange={(e) => setEditScheduledAt(e.target.value)}
+                    />
+                  </td>
+                  <td>
+                    <span className="status-pill">{STATUS_LABELS[appointment.status]}</span>
+                  </td>
+                  <td>
+                    <input value={editReason} onChange={(e) => setEditReason(e.target.value)} />
+                  </td>
+                  <td>
+                    <div className="actions">
+                      <button type="button" disabled={savingEdit} onClick={() => saveEdit(appointment.id)}>
+                        {savingEdit ? "Saving..." : "Save"}
+                      </button>
+                      <button type="button" className="secondary" onClick={cancelEdit}>
+                        Cancel
+                      </button>
+                    </div>
+                  </td>
+                </tr>
+              ) : (
+                <tr key={appointment.id}>
+                  <td>{appointment.petName}</td>
+                  <td>{appointment.ownerName}</td>
+                  <td>{formatDateTime(appointment.scheduled_at)}</td>
+                  <td>
+                    <span className="status-pill">{STATUS_LABELS[appointment.status]}</span>
+                  </td>
+                  <td>{appointment.reason ?? "—"}</td>
+                  <td>
+                    <div className="actions">
+                      {ALLOWED_TRANSITIONS[appointment.status].map((next) => (
+                        <button
+                          key={next}
+                          type="button"
+                          className="secondary"
+                          onClick={() => handleTransition(appointment.id, next)}
+                        >
+                          {STATUS_LABELS[next]}
+                        </button>
+                      ))}
+                      <Link to={`/check-queue/${appointment.id}`} target="_blank" rel="noreferrer">
+                        Queue link
+                      </Link>
+                      {!TERMINAL_STATUSES.includes(appointment.status) && (
+                        <button
+                          type="button"
+                          className="secondary"
+                          onClick={() => startEdit(appointment.id, appointment.scheduled_at, appointment.reason)}
+                        >
+                          Edit
+                        </button>
+                      )}
                       <button
-                        key={next}
                         type="button"
                         className="secondary"
-                        onClick={() => handleTransition(appointment.id, next)}
+                        disabled={deletingId === appointment.id}
+                        onClick={() => handleDelete(appointment.id)}
                       >
-                        {STATUS_LABELS[next]}
+                        {deletingId === appointment.id ? "Deleting..." : "Delete"}
                       </button>
-                    ))}
-                    <Link to={`/check-queue/${appointment.id}`} target="_blank" rel="noreferrer">
-                      Queue link
-                    </Link>
-                    <button
-                      type="button"
-                      className="secondary"
-                      disabled={deletingId === appointment.id}
-                      onClick={() => handleDelete(appointment.id)}
-                    >
-                      {deletingId === appointment.id ? "Deleting..." : "Delete"}
-                    </button>
-                  </div>
-                </td>
-              </tr>
-            ))}
-            {appointments.length === 0 && (
+                    </div>
+                  </td>
+                </tr>
+              ),
+            )}
+            {visibleAppointments.length === 0 && (
               <tr>
                 <td colSpan={6} className="muted">
-                  No appointments yet.
+                  {appointments.length === 0 ? "No appointments yet." : "No appointments match your filters."}
                 </td>
               </tr>
             )}
-          </tbody>
-        </table>
+            </tbody>
+          </table>
+        </>
       )}
     </section>
   );

@@ -86,6 +86,38 @@ def test_add_pet_to_nonexistent_owner_returns_404(client, auth_headers):
     assert response.status_code == 404
 
 
+def test_update_owner(client, auth_headers):
+    create = client.post(
+        "/api/owners",
+        json={"first_name": "Jane", "last_name": "Doe", "phone": "555-1234"},
+        headers=auth_headers,
+    )
+    owner_id = create.json()["id"]
+
+    response = client.patch(
+        f"/api/owners/{owner_id}",
+        json={"phone": "555-9999"},
+        headers=auth_headers,
+    )
+    assert response.status_code == 200
+    body = response.json()
+    assert body["phone"] == "555-9999"
+    assert body["first_name"] == "Jane"
+
+
+def test_update_owner_requires_auth(client, auth_headers):
+    create = client.post("/api/owners", json={"first_name": "Jane", "last_name": "Doe"}, headers=auth_headers)
+    owner_id = create.json()["id"]
+
+    response = client.patch(f"/api/owners/{owner_id}", json={"phone": "555-9999"})
+    assert response.status_code == 401
+
+
+def test_update_owner_not_found(client, auth_headers):
+    response = client.patch(f"/api/owners/{uuid.uuid4()}", json={"phone": "555-9999"}, headers=auth_headers)
+    assert response.status_code == 404
+
+
 def test_delete_owner_without_dependents_succeeds(client, auth_headers):
     create = client.post("/api/owners", json={"first_name": "Jane", "last_name": "Doe"}, headers=auth_headers)
     owner_id = create.json()["id"]

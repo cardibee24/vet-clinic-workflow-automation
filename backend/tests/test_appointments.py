@@ -1,5 +1,5 @@
 import uuid
-from datetime import datetime
+from datetime import datetime, timedelta
 
 import pytest
 
@@ -104,6 +104,80 @@ def test_get_appointment(client, auth_headers, pet):
 def test_get_appointment_not_found(client, auth_headers):
     response = client.get(f"/api/appointments/{uuid.uuid4()}", headers=auth_headers)
     assert response.status_code == 404
+
+
+def test_update_appointment(client, auth_headers, pet):
+    create = client.post(
+        "/api/appointments",
+        json={"pet_id": str(pet.id), "scheduled_at": _scheduled_at().isoformat(), "reason": "Checkup"},
+        headers=auth_headers,
+    )
+    appointment_id = create.json()["id"]
+
+    new_time = _scheduled_at() + timedelta(days=1)
+    response = client.patch(
+        f"/api/appointments/{appointment_id}",
+        json={"scheduled_at": new_time.isoformat(), "reason": "Rescheduled checkup"},
+        headers=auth_headers,
+    )
+    assert response.status_code == 200
+    body = response.json()
+    assert body["scheduled_at"] == new_time.isoformat()
+    assert body["reason"] == "Rescheduled checkup"
+
+
+def test_update_appointment_requires_auth(client, auth_headers, pet):
+    create = client.post(
+        "/api/appointments",
+        json={"pet_id": str(pet.id), "scheduled_at": _scheduled_at().isoformat()},
+        headers=auth_headers,
+    )
+    appointment_id = create.json()["id"]
+
+    response = client.patch(f"/api/appointments/{appointment_id}", json={"reason": "Rescheduled"})
+    assert response.status_code == 401
+
+
+def test_update_appointment_not_found(client, auth_headers):
+    response = client.patch(
+        f"/api/appointments/{uuid.uuid4()}", json={"reason": "Rescheduled"}, headers=auth_headers
+    )
+    assert response.status_code == 404
+
+
+def test_update_appointment_rejects_nonexistent_assigned_user(client, auth_headers, pet):
+    create = client.post(
+        "/api/appointments",
+        json={"pet_id": str(pet.id), "scheduled_at": _scheduled_at().isoformat()},
+        headers=auth_headers,
+    )
+    appointment_id = create.json()["id"]
+
+    response = client.patch(
+        f"/api/appointments/{appointment_id}",
+        json={"assigned_user_id": str(uuid.uuid4())},
+        headers=auth_headers,
+    )
+    assert response.status_code == 404
+
+
+def test_update_appointment_blocked_when_completed(client, auth_headers, pet):
+    create = client.post(
+        "/api/appointments",
+        json={"pet_id": str(pet.id), "scheduled_at": _scheduled_at().isoformat()},
+        headers=auth_headers,
+    )
+    appointment_id = create.json()["id"]
+    client.patch(f"/api/appointments/{appointment_id}/status", json={"status": "checked_in"}, headers=auth_headers)
+    client.patch(
+        f"/api/appointments/{appointment_id}/status", json={"status": "in_progress"}, headers=auth_headers
+    )
+    client.patch(f"/api/appointments/{appointment_id}/status", json={"status": "completed"}, headers=auth_headers)
+
+    response = client.patch(
+        f"/api/appointments/{appointment_id}", json={"reason": "Too late"}, headers=auth_headers
+    )
+    assert response.status_code == 409
 
 
 def test_check_in_then_complete_appointment(client, auth_headers, pet):

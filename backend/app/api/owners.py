@@ -10,7 +10,7 @@ from app.models.invoice import Invoice
 from app.models.owner import Owner
 from app.models.pet import Pet
 from app.models.user import User
-from app.schemas.owner import OwnerCreate, OwnerOut, OwnerWithPets
+from app.schemas.owner import OwnerCreate, OwnerOut, OwnerUpdate, OwnerWithPets
 from app.schemas.pet import PetCreate, PetOut
 
 router = APIRouter()
@@ -67,6 +67,20 @@ def add_pet(
     db.add(pet)
     db.flush()
     return pet
+
+
+@router.patch("/{owner_id}", response_model=OwnerOut)
+def update_owner(
+    owner_id: uuid.UUID,
+    body: OwnerUpdate,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+) -> Owner:
+    owner = _get_owner_or_404(db, owner_id)
+    for field, value in body.model_dump(exclude_unset=True).items():
+        setattr(owner, field, value)
+    db.flush()
+    return owner
 
 
 @router.delete("/{owner_id}", status_code=status.HTTP_204_NO_CONTENT)

@@ -37,6 +37,28 @@ def test_list_pets(client, auth_headers, pet):
     assert pet["id"] in [p["id"] for p in body]
 
 
+def test_update_pet(client, auth_headers, pet):
+    response = client.patch(
+        f"/api/pets/{pet['id']}",
+        json={"breed": "Labrador"},
+        headers=auth_headers,
+    )
+    assert response.status_code == 200
+    body = response.json()
+    assert body["breed"] == "Labrador"
+    assert body["name"] == "Rex"
+
+
+def test_update_pet_requires_auth(client, pet):
+    response = client.patch(f"/api/pets/{pet['id']}", json={"breed": "Labrador"})
+    assert response.status_code == 401
+
+
+def test_update_pet_not_found(client, auth_headers):
+    response = client.patch(f"/api/pets/{uuid.uuid4()}", json={"breed": "Labrador"}, headers=auth_headers)
+    assert response.status_code == 404
+
+
 def test_delete_pet_without_appointments_succeeds(client, auth_headers, pet):
     response = client.delete(f"/api/pets/{pet['id']}", headers=auth_headers)
     assert response.status_code == 204

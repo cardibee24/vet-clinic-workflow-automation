@@ -16,6 +16,7 @@ from app.schemas.appointment import (
     AppointmentOut,
     AppointmentQueueStatus,
     AppointmentStatusUpdate,
+    AppointmentUpdate,
     QueueEntry,
     QueueSummary,
 )
@@ -35,6 +36,8 @@ _ALLOWED_TRANSITIONS: dict[AppointmentStatus, set[AppointmentStatus]] = {
     AppointmentStatus.CANCELLED: set(),
     AppointmentStatus.NO_SHOW: set(),
 }
+
+_TERMINAL_STATUSES = {status_ for status_, next_states in _ALLOWED_TRANSITIONS.items() if not next_states}
 
 
 def _get_appointment_or_404(db: Session, appointment_id: uuid.UUID) -> Appointment:
@@ -139,6 +142,30 @@ def get_appointment_queue_status(
         position=position,
         total_waiting=len(waiting),
     )
+
+
+@router.patch("/{appointment_id}", response_model=AppointmentOut)
+def update_appointment(
+    appointment_id: uuid.UUID,
+    body: AppointmentUpdate,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+) -> Appointment:
+    appointment = _get_appointment_or_404(db, appointment_id)
+    if appointment.status in _TERMINAL_STATUSES:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail=f"Cannot edit an appointment that is '{appointment.status.value}'",
+        )
+
+    updates = body.model_dump(exclude_unset=True)
+    if "assigned_user_id" in updates and updates["assigned_user_id"] is not None:
+        _require_assigned_user(db, updates["assigned_user_id"])
+
+    for field, value in updates.items():
+        setattr(appointment, field, value)
+    db.flush()
+    return appointment
 
 
 @router.patch("/{appointment_id}/status", response_model=AppointmentOut)

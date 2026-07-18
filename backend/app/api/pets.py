@@ -9,7 +9,7 @@ from app.db.session import get_db
 from app.models.appointment import Appointment
 from app.models.pet import Pet
 from app.models.user import User
-from app.schemas.pet import PetOut
+from app.schemas.pet import PetOut, PetUpdate
 
 router = APIRouter()
 
@@ -28,6 +28,20 @@ def list_pets(
 ) -> list[Pet]:
     stmt = select(Pet).order_by(Pet.name)
     return list(db.execute(stmt).scalars().all())
+
+
+@router.patch("/{pet_id}", response_model=PetOut)
+def update_pet(
+    pet_id: uuid.UUID,
+    body: PetUpdate,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+) -> Pet:
+    pet = _get_pet_or_404(db, pet_id)
+    for field, value in body.model_dump(exclude_unset=True).items():
+        setattr(pet, field, value)
+    db.flush()
+    return pet
 
 
 @router.delete("/{pet_id}", status_code=status.HTTP_204_NO_CONTENT)

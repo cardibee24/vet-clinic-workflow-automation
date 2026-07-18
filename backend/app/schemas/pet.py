@@ -11,6 +11,13 @@ class PetCreate(BaseModel):
     date_of_birth: date | None = None
 
 
+class PetUpdate(BaseModel):
+    name: str | None = None
+    species: str | None = None
+    breed: str | None = None
+    date_of_birth: date | None = None
+
+
 class PetOut(BaseModel):
     id: uuid.UUID
     owner_id: uuid.UUID

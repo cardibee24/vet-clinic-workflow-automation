@@ -35,6 +35,13 @@ export interface OwnerCreateInput {
   phone?: string;
 }
 
+export interface OwnerUpdateInput {
+  first_name?: string;
+  last_name?: string;
+  email?: string;
+  phone?: string;
+}
+
 export function listOwners(token: string): Promise<Owner[]> {
   return apiFetch("/api/owners", { token });
 }
@@ -49,6 +56,10 @@ export function getOwner(token: string, ownerId: string): Promise<OwnerWithPets>
 
 export function addPet(token: string, ownerId: string, body: PetCreateInput): Promise<Pet> {
   return apiFetch(`/api/owners/${ownerId}/pets`, { method: "POST", token, body });
+}
+
+export function updateOwner(token: string, ownerId: string, body: OwnerUpdateInput): Promise<Owner> {
+  return apiFetch(`/api/owners/${ownerId}`, { method: "PATCH", token, body });
 }
 
 export function deleteOwner(token: string, ownerId: string): Promise<void> {

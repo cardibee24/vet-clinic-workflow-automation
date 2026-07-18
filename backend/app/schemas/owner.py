@@ -12,6 +12,13 @@ class OwnerCreate(BaseModel):
     phone: str | None = None
 
 
+class OwnerUpdate(BaseModel):
+    first_name: str | None = None
+    last_name: str | None = None
+    email: str | None = None
+    phone: str | None = None
+
+
 class OwnerOut(BaseModel):
     id: uuid.UUID
     first_name: str

@@ -2,7 +2,14 @@ import { useEffect, useState, type FormEvent } from "react";
 import { Link, useParams } from "react-router-dom";
 import { useToken } from "../auth/AuthContext";
 import { addPet, getOwner, type OwnerWithPets } from "../api/owners";
-import { deletePet } from "../api/pets";
+import { deletePet, updatePet } from "../api/pets";
+
+interface PetEditState {
+  name: string;
+  species: string;
+  breed: string;
+  dateOfBirth: string;
+}
 
 export function OwnerDetailPage() {
   const token = useToken();
@@ -18,8 +25,12 @@ export function OwnerDetailPage() {
   const [dateOfBirth, setDateOfBirth] = useState("");
   const [submitting, setSubmitting] = useState(false);
   const [formError, setFormError] = useState<string | null>(null);
-  const [deleteError, setDeleteError] = useState<string | null>(null);
+  const [rowError, setRowError] = useState<string | null>(null);
   const [deletingPetId, setDeletingPetId] = useState<string | null>(null);
+
+  const [editingPetId, setEditingPetId] = useState<string | null>(null);
+  const [petEditState, setPetEditState] = useState<PetEditState | null>(null);
+  const [savingEdit, setSavingEdit] = useState(false);
 
   function refresh() {
     if (!ownerId) return;
@@ -64,14 +75,50 @@ export function OwnerDetailPage() {
       return;
     }
     setDeletingPetId(pet.id);
-    setDeleteError(null);
+    setRowError(null);
     try {
       await deletePet(token, pet.id);
       refresh();
     } catch (error) {
-      setDeleteError(error instanceof Error ? error.message : "Failed to delete pet");
+      setRowError(error instanceof Error ? error.message : "Failed to delete pet");
     } finally {
       setDeletingPetId(null);
+    }
+  }
+
+  function startEditPet(pet: OwnerWithPets["pets"][number]) {
+    setRowError(null);
+    setEditingPetId(pet.id);
+    setPetEditState({
+      name: pet.name,
+      species: pet.species,
+      breed: pet.breed ?? "",
+      dateOfBirth: pet.date_of_birth ?? "",
+    });
+  }
+
+  function cancelEditPet() {
+    setEditingPetId(null);
+    setPetEditState(null);
+  }
+
+  async function saveEditPet(petId: string) {
+    if (!petEditState) return;
+    setSavingEdit(true);
+    setRowError(null);
+    try {
+      await updatePet(token, petId, {
+        name: petEditState.name,
+        species: petEditState.species,
+        breed: petEditState.breed || undefined,
+        date_of_birth: petEditState.dateOfBirth || undefined,
+      });
+      cancelEditPet();
+      refresh();
+    } catch (error) {
+      setRowError(error instanceof Error ? error.message : "Failed to update pet");
+    } finally {
+      setSavingEdit(false);
     }
   }
 
@@ -92,7 +139,7 @@ export function OwnerDetailPage() {
       </p>
 
       <h3>Pets</h3>
-      {deleteError && <p className="error-text">{deleteError}</p>}
+      {rowError && <p className="error-text">{rowError}</p>}
       <table>
         <thead>
           <tr>
@@ -104,24 +151,72 @@ export function OwnerDetailPage() {
           </tr>
         </thead>
         <tbody>
-          {owner.pets.map((pet) => (
-            <tr key={pet.id}>
-              <td>{pet.name}</td>
-              <td>{pet.species}</td>
-              <td>{pet.breed ?? "—"}</td>
-              <td>{pet.date_of_birth ?? "—"}</td>
-              <td>
-                <button
-                  type="button"
-                  className="secondary"
-                  disabled={deletingPetId === pet.id}
-                  onClick={() => handleDeletePet(pet)}
-                >
-                  {deletingPetId === pet.id ? "Deleting..." : "Delete"}
-                </button>
-              </td>
-            </tr>
-          ))}
+          {owner.pets.map((pet) =>
+            editingPetId === pet.id && petEditState ? (
+              <tr key={pet.id}>
+                <td>
+                  <input
+                    value={petEditState.name}
+                    onChange={(e) => setPetEditState({ ...petEditState, name: e.target.value })}
+                    placeholder="Name"
+                  />
+                </td>
+                <td>
+                  <input
+                    value={petEditState.species}
+                    onChange={(e) => setPetEditState({ ...petEditState, species: e.target.value })}
+                    placeholder="Species"
+                  />
+                </td>
+                <td>
+                  <input
+                    value={petEditState.breed}
+                    onChange={(e) => setPetEditState({ ...petEditState, breed: e.target.value })}
+                    placeholder="Breed"
+                  />
+                </td>
+                <td>
+                  <input
+                    type="date"
+                    value={petEditState.dateOfBirth}
+                    onChange={(e) => setPetEditState({ ...petEditState, dateOfBirth: e.target.value })}
+                  />
+                </td>
+                <td>
+                  <div className="actions">
+                    <button type="button" disabled={savingEdit} onClick={() => saveEditPet(pet.id)}>
+                      {savingEdit ? "Saving..." : "Save"}
+                    </button>
+                    <button type="button" className="secondary" onClick={cancelEditPet}>
+                      Cancel
+                    </button>
+                  </div>
+                </td>
+              </tr>
+            ) : (
+              <tr key={pet.id}>
+                <td>{pet.name}</td>
+                <td>{pet.species}</td>
+                <td>{pet.breed ?? "—"}</td>
+                <td>{pet.date_of_birth ?? "—"}</td>
+                <td>
+                  <div className="actions">
+                    <button type="button" className="secondary" onClick={() => startEditPet(pet)}>
+                      Edit
+                    </button>
+                    <button
+                      type="button"
+                      className="secondary"
+                      disabled={deletingPetId === pet.id}
+                      onClick={() => handleDeletePet(pet)}
+                    >
+                      {deletingPetId === pet.id ? "Deleting..." : "Delete"}
+                    </button>
+                  </div>
+                </td>
+              </tr>
+            ),
+          )}
           {owner.pets.length === 0 && (
             <tr>
               <td colSpan={5} className="muted">
