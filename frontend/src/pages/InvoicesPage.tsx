@@ -1,7 +1,7 @@
 import { useEffect, useState, type FormEvent } from "react";
 import { Link } from "react-router-dom";
 import { useToken } from "../auth/AuthContext";
-import { createInvoice, listInvoices, type Invoice, type InvoiceStatus } from "../api/invoices";
+import { createInvoice, deleteInvoice, listInvoices, type Invoice, type InvoiceStatus } from "../api/invoices";
 import { listOwners, type Owner } from "../api/owners";
 import { useAppointmentDirectory } from "../hooks/useAppointmentDirectory";
 
@@ -27,6 +27,8 @@ export function InvoicesPage() {
   const [notes, setNotes] = useState("");
   const [submitting, setSubmitting] = useState(false);
   const [formError, setFormError] = useState<string | null>(null);
+  const [rowError, setRowError] = useState<string | null>(null);
+  const [deletingId, setDeletingId] = useState<string | null>(null);
 
   function refresh() {
     setLoading(true);
@@ -65,6 +67,22 @@ export function InvoicesPage() {
       setFormError(err instanceof Error ? err.message : "Failed to create invoice");
     } finally {
       setSubmitting(false);
+    }
+  }
+
+  async function handleDelete(invoice: Invoice) {
+    if (!window.confirm("Delete this draft invoice? This cannot be undone.")) {
+      return;
+    }
+    setDeletingId(invoice.id);
+    setRowError(null);
+    try {
+      await deleteInvoice(token, invoice.id);
+      refresh();
+    } catch (err) {
+      setRowError(err instanceof Error ? err.message : "Failed to delete invoice");
+    } finally {
+      setDeletingId(null);
     }
   }
 
@@ -129,6 +147,7 @@ export function InvoicesPage() {
 
       {loading && <p>Loading invoices...</p>}
       {loadError && <p className="error-text">{loadError}</p>}
+      {rowError && <p className="error-text">{rowError}</p>}
       {!loading && !loadError && (
         <table>
           <thead>
@@ -150,7 +169,19 @@ export function InvoicesPage() {
                 <td>{invoice.due_date ?? "—"}</td>
                 <td>{invoice.notes ?? "—"}</td>
                 <td>
-                  <Link to={`/invoices/${invoice.id}`}>View</Link>
+                  <div className="actions">
+                    <Link to={`/invoices/${invoice.id}`}>View</Link>
+                    {invoice.status === "draft" && (
+                      <button
+                        type="button"
+                        className="secondary"
+                        disabled={deletingId === invoice.id}
+                        onClick={() => handleDelete(invoice)}
+                      >
+                        {deletingId === invoice.id ? "Deleting..." : "Delete"}
+                      </button>
+                    )}
+                  </div>
                 </td>
               </tr>
             ))}

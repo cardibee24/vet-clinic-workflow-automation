@@ -147,3 +147,24 @@ def update_invoice_status(
     invoice.status = body.status
     db.flush()
     return invoice
+
+
+@router.delete("/{invoice_id}", status_code=status.HTTP_204_NO_CONTENT)
+def delete_invoice(
+    invoice_id: uuid.UUID,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+) -> None:
+    invoice = _get_invoice_or_404(db, invoice_id)
+    if invoice.status != InvoiceStatus.DRAFT:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="Cannot delete a non-draft invoice; void it instead",
+        )
+
+    for line_item in _get_line_items(db, invoice.id):
+        db.delete(line_item)
+    db.flush()
+
+    db.delete(invoice)
+    db.flush()

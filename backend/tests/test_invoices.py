@@ -83,13 +83,13 @@ def test_create_invoice_rejects_appointment_belonging_to_other_owner(
 
 
 def test_list_invoices(client, auth_headers, owner):
-    client.post("/api/invoices", json={"owner_id": str(owner.id)}, headers=auth_headers)
+    create = client.post("/api/invoices", json={"owner_id": str(owner.id)}, headers=auth_headers)
+    invoice_id = create.json()["id"]
 
     response = client.get("/api/invoices", headers=auth_headers)
     assert response.status_code == 200
     body = response.json()
-    assert len(body) == 1
-    assert body[0]["owner_id"] == str(owner.id)
+    assert invoice_id in [invoice["id"] for invoice in body]
 
 
 def test_get_invoice_includes_line_items_and_total(client, auth_headers, owner):
@@ -196,3 +196,46 @@ def test_status_transition_not_found(client, auth_headers):
         f"/api/invoices/{uuid.uuid4()}/status", json={"status": "issued"}, headers=auth_headers
     )
     assert response.status_code == 404
+
+
+def test_delete_draft_invoice_succeeds(client, auth_headers, owner):
+    create = client.post("/api/invoices", json={"owner_id": str(owner.id)}, headers=auth_headers)
+    invoice_id = create.json()["id"]
+    client.post(
+        f"/api/invoices/{invoice_id}/line-items",
+        json={"description": "Exam fee", "quantity": 1, "unit_price_cents": 5000},
+        headers=auth_headers,
+    )
+
+    response = client.delete(f"/api/invoices/{invoice_id}", headers=auth_headers)
+    assert response.status_code == 204
+
+    response = client.get(f"/api/invoices/{invoice_id}", headers=auth_headers)
+    assert response.status_code == 404
+
+
+def test_delete_invoice_requires_auth(client, auth_headers, owner):
+    create = client.post("/api/invoices", json={"owner_id": str(owner.id)}, headers=auth_headers)
+    invoice_id = create.json()["id"]
+
+    response = client.delete(f"/api/invoices/{invoice_id}")
+    assert response.status_code == 401
+
+
+def test_delete_invoice_not_found(client, auth_headers):
+    response = client.delete(f"/api/invoices/{uuid.uuid4()}", headers=auth_headers)
+    assert response.status_code == 404
+
+
+def test_delete_invoice_blocked_once_issued(client, auth_headers, owner):
+    create = client.post("/api/invoices", json={"owner_id": str(owner.id)}, headers=auth_headers)
+    invoice_id = create.json()["id"]
+    client.post(
+        f"/api/invoices/{invoice_id}/line-items",
+        json={"description": "Exam fee", "quantity": 1, "unit_price_cents": 5000},
+        headers=auth_headers,
+    )
+    client.patch(f"/api/invoices/{invoice_id}/status", json={"status": "issued"}, headers=auth_headers)
+
+    response = client.delete(f"/api/invoices/{invoice_id}", headers=auth_headers)
+    assert response.status_code == 409

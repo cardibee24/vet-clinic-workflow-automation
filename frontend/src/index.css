@@ -243,6 +243,38 @@ th {
   flex-wrap: wrap;
 }
 
+.stat-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 16px;
+  margin-bottom: 24px;
+}
+
+.stat-tile {
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 16px 20px;
+}
+
+.stat-tile .stat-label {
+  font-size: 13px;
+  color: var(--text);
+  margin-bottom: 6px;
+}
+
+.stat-tile .stat-value {
+  font-size: 36px;
+  font-weight: 600;
+  line-height: 1.1;
+  color: var(--text-h);
+}
+
+.stat-tile .stat-link {
+  display: inline-block;
+  margin-top: 8px;
+  font-size: 13px;
+}
+
 .muted {
   color: var(--text);
   font-size: 14px;

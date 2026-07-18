@@ -1,8 +1,9 @@
 import { useEffect, useState, type FormEvent } from "react";
-import { Link, useParams } from "react-router-dom";
+import { Link, useNavigate, useParams } from "react-router-dom";
 import { useToken } from "../auth/AuthContext";
 import {
   addLineItem,
+  deleteInvoice,
   getInvoice,
   updateInvoiceStatus,
   type InvoiceStatus,
@@ -27,11 +28,13 @@ const STATUS_LABELS: Record<InvoiceStatus, string> = {
 export function InvoiceDetailPage() {
   const token = useToken();
   const { invoiceId } = useParams<{ invoiceId: string }>();
+  const navigate = useNavigate();
 
   const [invoice, setInvoice] = useState<InvoiceWithLineItems | null>(null);
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [actionError, setActionError] = useState<string | null>(null);
+  const [deleting, setDeleting] = useState(false);
 
   const [description, setDescription] = useState("");
   const [quantity, setQuantity] = useState("1");
@@ -84,6 +87,22 @@ export function InvoiceDetailPage() {
       refresh();
     } catch (err) {
       setActionError(err instanceof Error ? err.message : "Failed to update invoice");
+    }
+  }
+
+  async function handleDelete() {
+    if (!invoiceId) return;
+    if (!window.confirm("Delete this draft invoice? This cannot be undone.")) {
+      return;
+    }
+    setDeleting(true);
+    setActionError(null);
+    try {
+      await deleteInvoice(token, invoiceId);
+      navigate("/invoices");
+    } catch (err) {
+      setActionError(err instanceof Error ? err.message : "Failed to delete invoice");
+      setDeleting(false);
     }
   }
 
@@ -193,6 +212,11 @@ export function InvoiceDetailPage() {
             Mark as {STATUS_LABELS[next]}
           </button>
         ))}
+        {isDraft && (
+          <button type="button" className="secondary" disabled={deleting} onClick={handleDelete}>
+            {deleting ? "Deleting..." : "Delete invoice"}
+          </button>
+        )}
       </div>
       {actionError && <p className="error-text">{actionError}</p>}
     </section>

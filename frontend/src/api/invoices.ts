@@ -58,3 +58,7 @@ export function addLineItem(token: string, invoiceId: string, body: LineItemCrea
 export function updateInvoiceStatus(token: string, invoiceId: string, status: InvoiceStatus): Promise<Invoice> {
   return apiFetch(`/api/invoices/${invoiceId}/status`, { method: "PATCH", token, body: { status } });
 }
+
+export function deleteInvoice(token: string, invoiceId: string): Promise<void> {
+  return apiFetch(`/api/invoices/${invoiceId}`, { method: "DELETE", token });
+}

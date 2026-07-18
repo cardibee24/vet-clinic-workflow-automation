@@ -16,7 +16,7 @@ export function LoginPage() {
     return <p style={{ padding: 24 }}>Loading...</p>;
   }
   if (state.status === "signed-in") {
-    return <Navigate to="/owners" replace />;
+    return <Navigate to="/dashboard" replace />;
   }
 
   async function handleSubmit(event: FormEvent) {
@@ -25,7 +25,7 @@ export function LoginPage() {
     setError(null);
     try {
       await login(email, password);
-      navigate("/owners");
+      navigate("/dashboard");
     } catch (err) {
       setError(err instanceof Error ? err.message : "Login failed");
     } finally {

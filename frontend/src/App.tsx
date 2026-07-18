@@ -3,6 +3,7 @@ import { AuthProvider } from "./auth/AuthContext";
 import { Layout } from "./components/Layout";
 import { ProtectedRoute } from "./components/ProtectedRoute";
 import { LoginPage } from "./pages/LoginPage";
+import { DashboardPage } from "./pages/DashboardPage";
 import { OwnersPage } from "./pages/OwnersPage";
 import { OwnerDetailPage } from "./pages/OwnerDetailPage";
 import { AppointmentsPage } from "./pages/AppointmentsPage";
@@ -21,7 +22,8 @@ function App() {
           <Route path="/check-queue/:appointmentId" element={<CheckQueuePage />} />
           <Route element={<ProtectedRoute />}>
             <Route element={<Layout />}>
-              <Route index element={<Navigate to="/owners" replace />} />
+              <Route index element={<Navigate to="/dashboard" replace />} />
+              <Route path="dashboard" element={<DashboardPage />} />
               <Route path="owners" element={<OwnersPage />} />
               <Route path="owners/:ownerId" element={<OwnerDetailPage />} />
               <Route path="appointments" element={<AppointmentsPage />} />
