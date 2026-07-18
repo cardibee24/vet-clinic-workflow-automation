@@ -2,10 +2,12 @@ import { useState, type FormEvent } from "react";
 import { Link } from "react-router-dom";
 import { useToken } from "../auth/AuthContext";
 import {
+  APPOINTMENT_REASON_LABELS,
   createAppointment,
   deleteAppointment,
   updateAppointment,
   updateAppointmentStatus,
+  type AppointmentReason,
   type AppointmentStatus,
 } from "../api/appointments";
 import { useAppointmentDirectory } from "../hooks/useAppointmentDirectory";
@@ -39,7 +41,7 @@ export function AppointmentsPage() {
 
   const [petId, setPetId] = useState("");
   const [scheduledAt, setScheduledAt] = useState("");
-  const [reason, setReason] = useState("");
+  const [reason, setReason] = useState<AppointmentReason | "">("");
   const [submitting, setSubmitting] = useState(false);
   const [formError, setFormError] = useState<string | null>(null);
   const [actionError, setActionError] = useState<string | null>(null);
@@ -47,7 +49,7 @@ export function AppointmentsPage() {
 
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editScheduledAt, setEditScheduledAt] = useState("");
-  const [editReason, setEditReason] = useState("");
+  const [editReason, setEditReason] = useState<AppointmentReason | "">("");
   const [savingEdit, setSavingEdit] = useState(false);
 
   const [search, setSearch] = useState("");
@@ -56,7 +58,8 @@ export function AppointmentsPage() {
   const visibleAppointments = appointments.filter((appointment) => {
     if (statusFilter !== "all" && appointment.status !== statusFilter) return false;
     if (!query) return true;
-    return [appointment.petName, appointment.ownerName, appointment.reason].some((field) =>
+    const reasonLabel = appointment.reason ? APPOINTMENT_REASON_LABELS[appointment.reason] : null;
+    return [appointment.petName, appointment.ownerName, reasonLabel].some((field) =>
       field?.toLowerCase().includes(query),
     );
   });
@@ -77,6 +80,34 @@ export function AppointmentsPage() {
       refresh();
     } catch (err) {
       setFormError(err instanceof Error ? err.message : "Failed to create appointment");
+    } finally {
+      setSubmitting(false);
+    }
+  }
+
+  async function handleWalkIn() {
+    if (!petId) {
+      setFormError("Select a pet first");
+      return;
+    }
+    setSubmitting(true);
+    setFormError(null);
+    try {
+      const now = new Date();
+      const pad = (n: number) => String(n).padStart(2, "0");
+      const nowLocal = `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())}T${pad(now.getHours())}:${pad(now.getMinutes())}:${pad(now.getSeconds())}`;
+      const created = await createAppointment(token, {
+        pet_id: petId,
+        scheduled_at: nowLocal,
+        reason: reason || undefined,
+      });
+      await updateAppointmentStatus(token, created.id, "checked_in");
+      setPetId("");
+      setScheduledAt("");
+      setReason("");
+      refresh();
+    } catch (err) {
+      setFormError(err instanceof Error ? err.message : "Failed to add walk-in");
     } finally {
       setSubmitting(false);
     }
@@ -108,7 +139,7 @@ export function AppointmentsPage() {
     }
   }
 
-  function startEdit(appointmentId: string, scheduledAtValue: string, reasonValue: string | null) {
+  function startEdit(appointmentId: string, scheduledAtValue: string, reasonValue: AppointmentReason | null) {
     setActionError(null);
     setEditingId(appointmentId);
     setEditScheduledAt(scheduledAtValue.slice(0, 16));
@@ -167,11 +198,33 @@ export function AppointmentsPage() {
           </div>
           <div className="field">
             <label htmlFor="reason">Reason</label>
-            <input id="reason" value={reason} onChange={(e) => setReason(e.target.value)} />
+            <select
+              id="reason"
+              value={reason}
+              onChange={(e) => setReason(e.target.value as AppointmentReason | "")}
+            >
+              <option value="">No reason</option>
+              {Object.entries(APPOINTMENT_REASON_LABELS).map(([value, label]) => (
+                <option key={value} value={value}>
+                  {label}
+                </option>
+              ))}
+            </select>
           </div>
-          <button type="submit" disabled={submitting || petDirectory.pets.length === 0}>
-            {submitting ? "Scheduling..." : "Schedule appointment"}
-          </button>
+          <div className="actions">
+            <button type="submit" disabled={submitting || petDirectory.pets.length === 0}>
+              {submitting ? "Scheduling..." : "Schedule appointment"}
+            </button>
+            <button
+              type="button"
+              className="secondary"
+              disabled={submitting || !petId}
+              onClick={handleWalkIn}
+              title="Skips the date/time picker and checks the pet in immediately"
+            >
+              {submitting ? "Adding..." : "Add walk-in (check in now)"}
+            </button>
+          </div>
         </div>
         {petDirectory.pets.length === 0 && !petDirectory.loading && (
           <p className="muted">Add an owner and a pet before scheduling an appointment.</p>
@@ -238,7 +291,17 @@ export function AppointmentsPage() {
                     <span className="status-pill">{STATUS_LABELS[appointment.status]}</span>
                   </td>
                   <td>
-                    <input value={editReason} onChange={(e) => setEditReason(e.target.value)} />
+                    <select
+                      value={editReason}
+                      onChange={(e) => setEditReason(e.target.value as AppointmentReason | "")}
+                    >
+                      <option value="">No reason</option>
+                      {Object.entries(APPOINTMENT_REASON_LABELS).map(([value, label]) => (
+                        <option key={value} value={value}>
+                          {label}
+                        </option>
+                      ))}
+                    </select>
                   </td>
                   <td>
                     <div className="actions">
@@ -259,7 +322,7 @@ export function AppointmentsPage() {
                   <td>
                     <span className="status-pill">{STATUS_LABELS[appointment.status]}</span>
                   </td>
-                  <td>{appointment.reason ?? "—"}</td>
+                  <td>{appointment.reason ? APPOINTMENT_REASON_LABELS[appointment.reason] : "—"}</td>
                   <td>
                     <div className="actions">
                       {ALLOWED_TRANSITIONS[appointment.status].map((next) => (

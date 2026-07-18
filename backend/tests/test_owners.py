@@ -161,3 +161,55 @@ def test_delete_owner_blocked_by_existing_invoice(client, auth_headers):
 
     response = client.delete(f"/api/owners/{owner_id}", headers=auth_headers)
     assert response.status_code == 409
+
+
+def test_lookup_owner_by_phone_requires_no_auth(client, auth_headers):
+    create = client.post(
+        "/api/owners",
+        json={"first_name": "Wendy", "last_name": "Walker", "phone": "555-0100-lookup"},
+        headers=auth_headers,
+    )
+    owner_id = create.json()["id"]
+    client.post(f"/api/owners/{owner_id}/pets", json={"name": "Rex", "species": "dog"}, headers=auth_headers)
+
+    response = client.get("/api/owners/lookup", params={"phone": "555-0100-lookup"})
+    assert response.status_code == 200
+    body = response.json()
+    assert len(body) == 1
+    assert body[0]["owner_id"] == owner_id
+    assert body[0]["first_name"] == "Wendy"
+    assert len(body[0]["pets"]) == 1
+    assert body[0]["pets"][0]["name"] == "Rex"
+
+
+def test_lookup_owner_by_phone_omits_contact_info(client, auth_headers):
+    create = client.post(
+        "/api/owners",
+        json={
+            "first_name": "Wendy",
+            "last_name": "Walker",
+            "phone": "555-0101-lookup",
+            "email": "wendy@example.com",
+        },
+        headers=auth_headers,
+    )
+    owner_id = create.json()["id"]
+
+    response = client.get("/api/owners/lookup", params={"phone": "555-0101-lookup"})
+    assert response.status_code == 200
+    body = response.json()[0]
+    assert body["owner_id"] == owner_id
+    assert "email" not in body
+    assert "phone" not in body
+
+
+def test_lookup_owner_by_phone_no_match_returns_empty(client):
+    response = client.get("/api/owners/lookup", params={"phone": "555-0102-no-such-number"})
+    assert response.status_code == 200
+    assert response.json() == []
+
+
+def test_lookup_owner_by_phone_blank_returns_empty(client):
+    response = client.get("/api/owners/lookup", params={"phone": "   "})
+    assert response.status_code == 200
+    assert response.json() == []

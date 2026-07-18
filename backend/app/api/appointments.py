@@ -19,6 +19,7 @@ from app.schemas.appointment import (
     AppointmentUpdate,
     QueueEntry,
     QueueSummary,
+    SelfCheckInRequest,
 )
 
 router = APIRouter()
@@ -82,6 +83,30 @@ def create_appointment(
         _require_assigned_user(db, body.assigned_user_id)
 
     appointment = Appointment(**body.model_dump())
+    db.add(appointment)
+    db.flush()
+    return appointment
+
+
+@router.post("/self-check-in", response_model=AppointmentOut, status_code=status.HTTP_201_CREATED)
+def self_check_in(
+    body: SelfCheckInRequest,
+    db: Session = Depends(get_db),
+) -> Appointment:
+    """Public: lets a client check themselves in for a walk-in, no login required.
+
+    Creates the appointment already checked in, scheduled for right now -
+    there is no prior booking to attach to.
+    """
+    _require_pet(db, body.pet_id)
+
+    appointment = Appointment(
+        pet_id=body.pet_id,
+        reason=body.reason,
+        scheduled_at=datetime.now(UTC).replace(tzinfo=None),
+        status=AppointmentStatus.CHECKED_IN,
+        checked_in_at=datetime.now(UTC).replace(tzinfo=None),
+    )
     db.add(appointment)
     db.flush()
     return appointment

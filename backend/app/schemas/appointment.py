@@ -3,14 +3,14 @@ from datetime import datetime
 
 from pydantic import BaseModel
 
-from app.models.appointment import AppointmentStatus
+from app.models.appointment import AppointmentReason, AppointmentStatus
 
 
 class AppointmentCreate(BaseModel):
     pet_id: uuid.UUID
     assigned_user_id: uuid.UUID | None = None
     scheduled_at: datetime
-    reason: str | None = None
+    reason: AppointmentReason | None = None
 
 
 class AppointmentOut(BaseModel):
@@ -19,7 +19,7 @@ class AppointmentOut(BaseModel):
     assigned_user_id: uuid.UUID | None
     scheduled_at: datetime
     status: AppointmentStatus
-    reason: str | None
+    reason: AppointmentReason | None
     checked_in_at: datetime | None
 
     model_config = {"from_attributes": True}
@@ -27,7 +27,7 @@ class AppointmentOut(BaseModel):
 
 class AppointmentUpdate(BaseModel):
     scheduled_at: datetime | None = None
-    reason: str | None = None
+    reason: AppointmentReason | None = None
     assigned_user_id: uuid.UUID | None = None
 
 
@@ -35,12 +35,17 @@ class AppointmentStatusUpdate(BaseModel):
     status: AppointmentStatus
 
 
+class SelfCheckInRequest(BaseModel):
+    pet_id: uuid.UUID
+    reason: AppointmentReason | None = None
+
+
 class QueueEntry(BaseModel):
     position: int
     appointment_id: uuid.UUID
     pet_id: uuid.UUID
     checked_in_at: datetime | None
-    reason: str | None
+    reason: AppointmentReason | None
 
 
 class QueueSummary(BaseModel):

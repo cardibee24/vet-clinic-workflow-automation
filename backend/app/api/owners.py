@@ -10,7 +10,14 @@ from app.models.invoice import Invoice
 from app.models.owner import Owner
 from app.models.pet import Pet
 from app.models.user import User
-from app.schemas.owner import OwnerCreate, OwnerOut, OwnerUpdate, OwnerWithPets
+from app.schemas.owner import (
+    OwnerCreate,
+    OwnerOut,
+    OwnerUpdate,
+    OwnerWithPets,
+    PublicOwnerLookupResult,
+    PublicPetSummary,
+)
 from app.schemas.pet import PetCreate, PetOut
 
 router = APIRouter()
@@ -42,6 +49,36 @@ def list_owners(
 ) -> list[Owner]:
     stmt = select(Owner).order_by(Owner.last_name, Owner.first_name)
     return list(db.execute(stmt).scalars().all())
+
+
+@router.get("/lookup", response_model=list[PublicOwnerLookupResult])
+def lookup_owners_by_phone(
+    phone: str,
+    db: Session = Depends(get_db),
+) -> list[PublicOwnerLookupResult]:
+    """Public: lets a client find themselves by exact phone number for self-check-in.
+
+    Exact match only (no partial/fuzzy search) so this can't be used to browse
+    or scrape the clinic's client list - you have to already know the phone
+    number to get a hit.
+    """
+    phone = phone.strip()
+    if not phone:
+        return []
+
+    owners = db.execute(select(Owner).where(Owner.phone == phone)).scalars().all()
+    results = []
+    for owner in owners:
+        pets = db.execute(select(Pet).where(Pet.owner_id == owner.id)).scalars().all()
+        results.append(
+            PublicOwnerLookupResult(
+                owner_id=owner.id,
+                first_name=owner.first_name,
+                last_name=owner.last_name,
+                pets=[PublicPetSummary(id=pet.id, name=pet.name, species=pet.species) for pet in pets],
+            )
+        )
+    return results
 
 
 @router.get("/{owner_id}", response_model=OwnerWithPets)

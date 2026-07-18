@@ -46,7 +46,7 @@ def test_create_appointment(client, auth_headers, pet):
         json={
             "pet_id": str(pet.id),
             "scheduled_at": _scheduled_at().isoformat(),
-            "reason": "Annual checkup",
+            "reason": "checkup",
         },
         headers=auth_headers,
     )
@@ -109,7 +109,7 @@ def test_get_appointment_not_found(client, auth_headers):
 def test_update_appointment(client, auth_headers, pet):
     create = client.post(
         "/api/appointments",
-        json={"pet_id": str(pet.id), "scheduled_at": _scheduled_at().isoformat(), "reason": "Checkup"},
+        json={"pet_id": str(pet.id), "scheduled_at": _scheduled_at().isoformat(), "reason": "checkup"},
         headers=auth_headers,
     )
     appointment_id = create.json()["id"]
@@ -117,13 +117,13 @@ def test_update_appointment(client, auth_headers, pet):
     new_time = _scheduled_at() + timedelta(days=1)
     response = client.patch(
         f"/api/appointments/{appointment_id}",
-        json={"scheduled_at": new_time.isoformat(), "reason": "Rescheduled checkup"},
+        json={"scheduled_at": new_time.isoformat(), "reason": "follow_up"},
         headers=auth_headers,
     )
     assert response.status_code == 200
     body = response.json()
     assert body["scheduled_at"] == new_time.isoformat()
-    assert body["reason"] == "Rescheduled checkup"
+    assert body["reason"] == "follow_up"
 
 
 def test_update_appointment_requires_auth(client, auth_headers, pet):
@@ -134,13 +134,13 @@ def test_update_appointment_requires_auth(client, auth_headers, pet):
     )
     appointment_id = create.json()["id"]
 
-    response = client.patch(f"/api/appointments/{appointment_id}", json={"reason": "Rescheduled"})
+    response = client.patch(f"/api/appointments/{appointment_id}", json={"reason": "follow_up"})
     assert response.status_code == 401
 
 
 def test_update_appointment_not_found(client, auth_headers):
     response = client.patch(
-        f"/api/appointments/{uuid.uuid4()}", json={"reason": "Rescheduled"}, headers=auth_headers
+        f"/api/appointments/{uuid.uuid4()}", json={"reason": "follow_up"}, headers=auth_headers
     )
     assert response.status_code == 404
 
@@ -175,7 +175,7 @@ def test_update_appointment_blocked_when_completed(client, auth_headers, pet):
     client.patch(f"/api/appointments/{appointment_id}/status", json={"status": "completed"}, headers=auth_headers)
 
     response = client.patch(
-        f"/api/appointments/{appointment_id}", json={"reason": "Too late"}, headers=auth_headers
+        f"/api/appointments/{appointment_id}", json={"reason": "follow_up"}, headers=auth_headers
     )
     assert response.status_code == 409
 
@@ -271,6 +271,36 @@ def test_check_in_sets_checked_in_at(client, auth_headers, pet):
     )
     assert response.status_code == 200
     assert response.json()["checked_in_at"] is not None
+
+
+def test_self_check_in_creates_checked_in_appointment(client, pet):
+    response = client.post("/api/appointments/self-check-in", json={"pet_id": str(pet.id), "reason": "checkup"})
+    assert response.status_code == 201
+    body = response.json()
+    assert body["pet_id"] == str(pet.id)
+    assert body["status"] == "checked_in"
+    assert body["reason"] == "checkup"
+    assert body["checked_in_at"] is not None
+
+
+def test_self_check_in_does_not_require_auth(client, pet):
+    response = client.post("/api/appointments/self-check-in", json={"pet_id": str(pet.id)})
+    assert response.status_code == 201
+
+
+def test_self_check_in_rejects_nonexistent_pet(client):
+    response = client.post("/api/appointments/self-check-in", json={"pet_id": str(uuid.uuid4())})
+    assert response.status_code == 404
+
+
+def test_self_check_in_appears_in_queue(client, auth_headers, pet):
+    create = client.post("/api/appointments/self-check-in", json={"pet_id": str(pet.id)})
+    appointment_id = create.json()["id"]
+
+    response = client.get("/api/appointments/queue", headers=auth_headers)
+    assert response.status_code == 200
+    body = response.json()
+    assert appointment_id in [entry["appointment_id"] for entry in body["entries"]]
 
 
 def test_get_queue_orders_by_check_in_time(client, auth_headers, pet, pet2):

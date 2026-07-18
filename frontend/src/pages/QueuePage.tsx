@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { useToken } from "../auth/AuthContext";
-import { getQueue, type QueueSummary } from "../api/appointments";
+import { APPOINTMENT_REASON_LABELS, getQueue, type QueueSummary } from "../api/appointments";
 import { usePetDirectory } from "../hooks/usePetDirectory";
 import { formatDateTime } from "../lib/format";
 
@@ -60,7 +60,7 @@ export function QueuePage() {
                     <td>{pet?.name ?? "Unknown pet"}</td>
                     <td>{pet?.ownerName ?? "Unknown owner"}</td>
                     <td>{entry.checked_in_at ? formatDateTime(entry.checked_in_at) : "—"}</td>
-                    <td>{entry.reason ?? "—"}</td>
+                    <td>{entry.reason ? APPOINTMENT_REASON_LABELS[entry.reason] : "—"}</td>
                   </tr>
                 );
               })}

@@ -65,3 +65,21 @@ export function updateOwner(token: string, ownerId: string, body: OwnerUpdateInp
 export function deleteOwner(token: string, ownerId: string): Promise<void> {
   return apiFetch(`/api/owners/${ownerId}`, { method: "DELETE", token });
 }
+
+export interface PublicPetSummary {
+  id: string;
+  name: string;
+  species: string;
+}
+
+export interface PublicOwnerLookupResult {
+  owner_id: string;
+  first_name: string;
+  last_name: string;
+  pets: PublicPetSummary[];
+}
+
+/** Public: no auth required, used by clients finding themselves for self-check-in. */
+export function lookupOwnersByPhone(phone: string): Promise<PublicOwnerLookupResult[]> {
+  return apiFetch(`/api/owners/lookup?phone=${encodeURIComponent(phone)}`);
+}

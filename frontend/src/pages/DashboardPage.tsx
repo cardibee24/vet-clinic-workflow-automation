@@ -1,10 +1,13 @@
 import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
+import { QRCodeSVG } from "qrcode.react";
 import { useToken } from "../auth/AuthContext";
-import { getQueue, type QueueSummary } from "../api/appointments";
+import { APPOINTMENT_REASON_LABELS, getQueue, type QueueSummary } from "../api/appointments";
 import { listInvoices, type Invoice } from "../api/invoices";
 import { useAppointmentDirectory } from "../hooks/useAppointmentDirectory";
 import { formatDateTime, isToday } from "../lib/format";
+
+const SELF_CHECK_IN_URL = `${window.location.origin}/self-check-in`;
 
 const STATUS_LABELS: Record<string, string> = {
   scheduled: "Scheduled",
@@ -91,6 +94,17 @@ export function DashboardPage() {
             </Link>
           </div>
 
+          <div className="card" style={{ display: "flex", gap: 20, alignItems: "center", maxWidth: 420 }}>
+            <QRCodeSVG value={SELF_CHECK_IN_URL} size={96} />
+            <div>
+              <p style={{ margin: 0, fontWeight: 600, color: "var(--text-h)" }}>Walk-in self check-in</p>
+              <p className="muted" style={{ marginTop: 4 }}>
+                Print or display this QR code at reception. Returning clients can scan it to check themselves in
+                without staff.
+              </p>
+            </div>
+          </div>
+
           <h3>Today's appointments</h3>
           <table>
             <thead>
@@ -111,7 +125,7 @@ export function DashboardPage() {
                   <td>
                     <span className="status-pill">{STATUS_LABELS[appointment.status]}</span>
                   </td>
-                  <td>{appointment.reason ?? "—"}</td>
+                  <td>{appointment.reason ? APPOINTMENT_REASON_LABELS[appointment.reason] : "—"}</td>
                 </tr>
               ))}
               {todaysAppointments.length === 0 && (

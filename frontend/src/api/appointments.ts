@@ -8,13 +8,32 @@ export type AppointmentStatus =
   | "cancelled"
   | "no_show";
 
+export type AppointmentReason =
+  | "checkup"
+  | "vaccination"
+  | "surgery"
+  | "dental"
+  | "follow_up"
+  | "emergency"
+  | "diagnostic";
+
+export const APPOINTMENT_REASON_LABELS: Record<AppointmentReason, string> = {
+  checkup: "Checkup",
+  vaccination: "Vaccination",
+  surgery: "Surgery",
+  dental: "Dental",
+  follow_up: "Follow-up",
+  emergency: "Emergency",
+  diagnostic: "Diagnostic",
+};
+
 export interface Appointment {
   id: string;
   pet_id: string;
   assigned_user_id: string | null;
   scheduled_at: string;
   status: AppointmentStatus;
-  reason: string | null;
+  reason: AppointmentReason | null;
   checked_in_at: string | null;
 }
 
@@ -23,7 +42,7 @@ export interface QueueEntry {
   appointment_id: string;
   pet_id: string;
   checked_in_at: string | null;
-  reason: string | null;
+  reason: AppointmentReason | null;
 }
 
 export interface QueueSummary {
@@ -42,12 +61,12 @@ export interface AppointmentCreateInput {
   pet_id: string;
   assigned_user_id?: string;
   scheduled_at: string;
-  reason?: string;
+  reason?: AppointmentReason;
 }
 
 export interface AppointmentUpdateInput {
   scheduled_at?: string;
-  reason?: string;
+  reason?: AppointmentReason;
   assigned_user_id?: string;
 }
 
@@ -86,4 +105,14 @@ export function getQueue(token: string): Promise<QueueSummary> {
 /** Public: no auth required, used by clients checking their own queue position. */
 export function getAppointmentQueueStatus(appointmentId: string): Promise<AppointmentQueueStatus> {
   return apiFetch(`/api/appointments/${appointmentId}/queue`);
+}
+
+export interface SelfCheckInInput {
+  pet_id: string;
+  reason?: AppointmentReason;
+}
+
+/** Public: no auth required, used by clients checking themselves in for a walk-in. */
+export function selfCheckIn(body: SelfCheckInInput): Promise<Appointment> {
+  return apiFetch("/api/appointments/self-check-in", { method: "POST", body });
 }

@@ -11,6 +11,7 @@ import { InvoicesPage } from "./pages/InvoicesPage";
 import { InvoiceDetailPage } from "./pages/InvoiceDetailPage";
 import { QueuePage } from "./pages/QueuePage";
 import { CheckQueuePage } from "./pages/CheckQueuePage";
+import { SelfCheckInPage } from "./pages/SelfCheckInPage";
 
 function App() {
   return (
@@ -20,6 +21,7 @@ function App() {
           <Route path="/login" element={<LoginPage />} />
           <Route path="/check-queue" element={<CheckQueuePage />} />
           <Route path="/check-queue/:appointmentId" element={<CheckQueuePage />} />
+          <Route path="/self-check-in" element={<SelfCheckInPage />} />
           <Route element={<ProtectedRoute />}>
             <Route element={<Layout />}>
               <Route index element={<Navigate to="/dashboard" replace />} />

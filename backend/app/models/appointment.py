@@ -18,6 +18,16 @@ class AppointmentStatus(str, enum.Enum):
     NO_SHOW = "no_show"
 
 
+class AppointmentReason(str, enum.Enum):
+    CHECKUP = "checkup"
+    VACCINATION = "vaccination"
+    SURGERY = "surgery"
+    DENTAL = "dental"
+    FOLLOW_UP = "follow_up"
+    EMERGENCY = "emergency"
+    DIAGNOSTIC = "diagnostic"
+
+
 class Appointment(Base, UUIDPKMixin, TimestampMixin):
     __tablename__ = "appointments"
 
@@ -34,5 +44,12 @@ class Appointment(Base, UUIDPKMixin, TimestampMixin):
         default=AppointmentStatus.SCHEDULED,
         server_default=AppointmentStatus.SCHEDULED.value,
     )
-    reason: Mapped[str | None] = mapped_column(nullable=True)
+    reason: Mapped[AppointmentReason | None] = mapped_column(
+        Enum(
+            AppointmentReason,
+            name="appointment_reason",
+            values_callable=lambda enum_cls: [e.value for e in enum_cls],
+        ),
+        nullable=True,
+    )
     checked_in_at: Mapped[datetime | None] = mapped_column(nullable=True)
