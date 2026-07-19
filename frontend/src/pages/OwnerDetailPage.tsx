@@ -128,9 +128,9 @@ export function OwnerDetailPage() {
 
   return (
     <section>
-      <p>
-        <Link to="/owners">&larr; Back to owners</Link>
-      </p>
+      <Link to="/owners" className="back-link">
+        &larr; Back to owners
+      </Link>
       <h2>
         {owner.first_name} {owner.last_name}
       </h2>

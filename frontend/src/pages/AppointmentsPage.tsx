@@ -247,7 +247,7 @@ export function AppointmentsPage() {
                     {STATUS_LABELS[next]}
                   </button>
                 ))}
-                <Link to={`/check-queue/${appointment.id}`} target="_blank" rel="noreferrer">
+                <Link to={`/check-queue/${appointment.id}`} target="_blank" rel="noreferrer" className="secondary">
                   Queue link
                 </Link>
                 {!TERMINAL_STATUSES.includes(appointment.status) && (

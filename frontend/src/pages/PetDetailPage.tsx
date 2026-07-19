@@ -50,7 +50,11 @@ export function PetDetailPage() {
 
   return (
     <section>
-      <p>{owner && <Link to={`/owners/${owner.id}`}>&larr; Back to {owner.first_name} {owner.last_name}</Link>}</p>
+      {owner && (
+        <Link to={`/owners/${owner.id}`} className="back-link">
+          &larr; Back to {owner.first_name} {owner.last_name}
+        </Link>
+      )}
       <h2>{pet.name}</h2>
       <p className="muted">
         {pet.species}

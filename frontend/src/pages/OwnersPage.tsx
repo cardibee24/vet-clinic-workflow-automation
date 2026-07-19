@@ -232,7 +232,9 @@ export function OwnersPage() {
                     <td>{owner.phone ?? "—"}</td>
                     <td>
                       <div className="actions">
-                        <Link to={`/owners/${owner.id}`}>View</Link>
+                        <Link to={`/owners/${owner.id}`} className="secondary">
+                          View
+                        </Link>
                         <button type="button" className="secondary" onClick={() => startEdit(owner)}>
                           Edit
                         </button>

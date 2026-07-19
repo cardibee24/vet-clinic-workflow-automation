@@ -75,36 +75,28 @@ export function DashboardPage() {
         <>
           <div className="stat-grid">
             <div className="stat-tile">
-              <div className="stat-label">
-                <span className="stat-icon">📅</span> Appointments today
-              </div>
+              <div className="stat-label">Appointments today</div>
               <div className="stat-value">{todaysAppointments.length}</div>
               <Link to="/appointments" className="stat-link">
                 View appointments
               </Link>
             </div>
             <div className="stat-tile">
-              <div className="stat-label">
-                <span className="stat-icon">⏳</span> Waiting now
-              </div>
+              <div className="stat-label">Waiting now</div>
               <div className="stat-value">{queue?.total_waiting ?? 0}</div>
               <Link to="/queue" className="stat-link">
                 View queue
               </Link>
             </div>
             <div className="stat-tile">
-              <div className="stat-label">
-                <span className="stat-icon">💳</span> Unpaid invoices
-              </div>
+              <div className="stat-label">Unpaid invoices</div>
               <div className="stat-value">{unpaidInvoiceCount}</div>
               <Link to="/invoices" className="stat-link">
                 View invoices
               </Link>
             </div>
             <div className="stat-tile">
-              <div className="stat-label">
-                <span className="stat-icon">⚠️</span> Overdue invoices
-              </div>
+              <div className="stat-label">Overdue invoices</div>
               <div className="stat-value">{overdueInvoices.length}</div>
               <Link to="/invoices" className="stat-link">
                 View invoices
@@ -184,7 +176,9 @@ export function DashboardPage() {
                   <td>{ownersById.get(invoice.owner_id) ?? invoice.owner_id}</td>
                   <td>{invoice.due_date}</td>
                   <td>
-                    <Link to={`/invoices/${invoice.id}`}>View</Link>
+                    <Link to={`/invoices/${invoice.id}`} className="secondary">
+                      View
+                    </Link>
                   </td>
                 </tr>
               ))}

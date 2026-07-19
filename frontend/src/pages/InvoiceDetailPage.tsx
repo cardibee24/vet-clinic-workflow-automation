@@ -176,10 +176,15 @@ export function InvoiceDetailPage() {
 
   return (
     <section>
-      <p>
-        <Link to="/invoices">&larr; Back to invoices</Link>
-      </p>
-      <h2>Invoice</h2>
+      <div className="actions" style={{ justifyContent: "space-between", alignItems: "flex-start" }}>
+        <Link to="/invoices" className="back-link" style={{ marginBottom: 0 }}>
+          &larr; Back to invoices
+        </Link>
+        <Link to={`/invoices/${invoice.id}/print`} target="_blank" rel="noreferrer" className="secondary">
+          Print / Save as PDF
+        </Link>
+      </div>
+      <h2 style={{ marginTop: 16 }}>Invoice</h2>
       <p>
         <span className={`status-pill ${statusPillClass(invoice.status)}`}>{STATUS_LABELS[invoice.status]}</span>
         {invoice.due_date && <span className="muted"> &middot; due {invoice.due_date}</span>}

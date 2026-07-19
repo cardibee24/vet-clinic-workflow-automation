@@ -211,7 +211,9 @@ export function InvoicesPage() {
                 <td>{invoice.notes ?? "—"}</td>
                 <td>
                   <div className="actions">
-                    <Link to={`/invoices/${invoice.id}`}>View</Link>
+                    <Link to={`/invoices/${invoice.id}`} className="secondary">
+                      View
+                    </Link>
                     {invoice.status === "draft" && (
                       <button
                         type="button"
