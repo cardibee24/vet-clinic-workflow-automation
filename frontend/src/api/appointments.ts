@@ -35,6 +35,7 @@ export interface Appointment {
   status: AppointmentStatus;
   reason: AppointmentReason | null;
   checked_in_at: string | null;
+  visit_notes: string | null;
 }
 
 export interface QueueEntry {
@@ -84,6 +85,18 @@ export function updateAppointment(
   body: AppointmentUpdateInput,
 ): Promise<Appointment> {
   return apiFetch(`/api/appointments/${appointmentId}`, { method: "PATCH", token, body });
+}
+
+export function updateAppointmentNotes(
+  token: string,
+  appointmentId: string,
+  visitNotes: string,
+): Promise<Appointment> {
+  return apiFetch(`/api/appointments/${appointmentId}/notes`, {
+    method: "PATCH",
+    token,
+    body: { visit_notes: visitNotes || null },
+  });
 }
 
 export function updateAppointmentStatus(

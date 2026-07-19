@@ -1,7 +1,6 @@
 import { useState, type FormEvent } from "react";
 import { Navigate, useNavigate } from "react-router-dom";
 import { useAuth } from "../auth/AuthContext";
-import { HealthCheckPage } from "./HealthCheckPage";
 
 export function LoginPage() {
   const { state, login } = useAuth();
@@ -34,10 +33,12 @@ export function LoginPage() {
   }
 
   return (
-    <>
-      <HealthCheckPage />
-      <section style={{ maxWidth: 360, margin: "0 auto", padding: 24, textAlign: "left" }}>
-        <h2>Staff login</h2>
+    <div className="auth-shell">
+      <div className="auth-card">
+        <div className="brand">
+          <span className="brand-mark">🐾</span> VetFlow
+        </div>
+        <h2>Staff sign in</h2>
         <form onSubmit={handleSubmit}>
           <div className="field">
             <label htmlFor="email">Email</label>
@@ -49,7 +50,7 @@ export function LoginPage() {
               required
             />
           </div>
-          <div className="field" style={{ marginTop: 12 }}>
+          <div className="field" style={{ marginTop: 14 }}>
             <label htmlFor="password">Password</label>
             <input
               id="password"
@@ -59,12 +60,12 @@ export function LoginPage() {
               required
             />
           </div>
-          <button type="submit" disabled={submitting} style={{ marginTop: 16 }}>
+          <button type="submit" disabled={submitting} style={{ marginTop: 20 }}>
             {submitting ? "Signing in..." : "Sign in"}
           </button>
         </form>
         {error && <p className="error-text">{error}</p>}
-      </section>
-    </>
+      </div>
+    </div>
   );
 }

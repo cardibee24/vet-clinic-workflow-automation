@@ -4,8 +4,14 @@ import { QRCodeSVG } from "qrcode.react";
 import { useToken } from "../auth/AuthContext";
 import { APPOINTMENT_REASON_LABELS, getQueue, type QueueSummary } from "../api/appointments";
 import { listInvoices, type Invoice } from "../api/invoices";
+import { listOwners, type Owner } from "../api/owners";
 import { useAppointmentDirectory } from "../hooks/useAppointmentDirectory";
-import { formatDateTime, isToday } from "../lib/format";
+import { formatDateTime, isToday, statusPillClass } from "../lib/format";
+
+function todayDateString(): string {
+  const now = new Date();
+  return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-${String(now.getDate()).padStart(2, "0")}`;
+}
 
 const SELF_CHECK_IN_URL = `${window.location.origin}/self-check-in`;
 
@@ -24,15 +30,17 @@ export function DashboardPage() {
 
   const [queue, setQueue] = useState<QueueSummary | null>(null);
   const [invoices, setInvoices] = useState<Invoice[]>([]);
+  const [owners, setOwners] = useState<Owner[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     setLoading(true);
-    Promise.all([getQueue(token), listInvoices(token)])
-      .then(([queueData, invoiceData]) => {
+    Promise.all([getQueue(token), listInvoices(token), listOwners(token)])
+      .then(([queueData, invoiceData, ownerData]) => {
         setQueue(queueData);
         setInvoices(invoiceData);
+        setOwners(ownerData);
         setError(null);
       })
       .catch((err: unknown) => setError(err instanceof Error ? err.message : "Failed to load dashboard"))
@@ -46,6 +54,12 @@ export function DashboardPage() {
   const unpaidInvoiceCount = invoices.filter(
     (invoice) => invoice.status === "draft" || invoice.status === "issued",
   ).length;
+
+  const ownersById = new Map(owners.map((owner) => [owner.id, `${owner.first_name} ${owner.last_name}`]));
+  const today = todayDateString();
+  const overdueInvoices = invoices
+    .filter((invoice) => invoice.status === "issued" && invoice.due_date !== null && invoice.due_date < today)
+    .sort((a, b) => (a.due_date ?? "").localeCompare(b.due_date ?? ""));
 
   const isLoading = appointmentsLoading || loading;
   const loadError = appointmentsError ?? error;
@@ -61,22 +75,37 @@ export function DashboardPage() {
         <>
           <div className="stat-grid">
             <div className="stat-tile">
-              <div className="stat-label">Appointments today</div>
+              <div className="stat-label">
+                <span className="stat-icon">📅</span> Appointments today
+              </div>
               <div className="stat-value">{todaysAppointments.length}</div>
               <Link to="/appointments" className="stat-link">
                 View appointments
               </Link>
             </div>
             <div className="stat-tile">
-              <div className="stat-label">Waiting now</div>
+              <div className="stat-label">
+                <span className="stat-icon">⏳</span> Waiting now
+              </div>
               <div className="stat-value">{queue?.total_waiting ?? 0}</div>
               <Link to="/queue" className="stat-link">
                 View queue
               </Link>
             </div>
             <div className="stat-tile">
-              <div className="stat-label">Unpaid invoices</div>
+              <div className="stat-label">
+                <span className="stat-icon">💳</span> Unpaid invoices
+              </div>
               <div className="stat-value">{unpaidInvoiceCount}</div>
+              <Link to="/invoices" className="stat-link">
+                View invoices
+              </Link>
+            </div>
+            <div className="stat-tile">
+              <div className="stat-label">
+                <span className="stat-icon">⚠️</span> Overdue invoices
+              </div>
+              <div className="stat-value">{overdueInvoices.length}</div>
               <Link to="/invoices" className="stat-link">
                 View invoices
               </Link>
@@ -123,7 +152,9 @@ export function DashboardPage() {
                   <td>{appointment.petName}</td>
                   <td>{appointment.ownerName}</td>
                   <td>
-                    <span className="status-pill">{STATUS_LABELS[appointment.status]}</span>
+                    <span className={`status-pill ${statusPillClass(appointment.status)}`}>
+                      {STATUS_LABELS[appointment.status]}
+                    </span>
                   </td>
                   <td>{appointment.reason ? APPOINTMENT_REASON_LABELS[appointment.reason] : "—"}</td>
                 </tr>
@@ -132,6 +163,35 @@ export function DashboardPage() {
                 <tr>
                   <td colSpan={5} className="muted">
                     No appointments scheduled for today.
+                  </td>
+                </tr>
+              )}
+            </tbody>
+          </table>
+
+          <h3>Overdue invoices</h3>
+          <table>
+            <thead>
+              <tr>
+                <th>Owner</th>
+                <th>Due date</th>
+                <th></th>
+              </tr>
+            </thead>
+            <tbody>
+              {overdueInvoices.map((invoice) => (
+                <tr key={invoice.id}>
+                  <td>{ownersById.get(invoice.owner_id) ?? invoice.owner_id}</td>
+                  <td>{invoice.due_date}</td>
+                  <td>
+                    <Link to={`/invoices/${invoice.id}`}>View</Link>
+                  </td>
+                </tr>
+              ))}
+              {overdueInvoices.length === 0 && (
+                <tr>
+                  <td colSpan={3} className="muted">
+                    No overdue invoices.
                   </td>
                 </tr>
               )}

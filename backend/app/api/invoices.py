@@ -19,6 +19,7 @@ from app.schemas.invoice import (
     InvoiceWithLineItems,
     LineItemCreate,
     LineItemOut,
+    LineItemUpdate,
 )
 
 router = APIRouter()
@@ -63,6 +64,16 @@ def _require_appointment_for_owner(db: Session, appointment_id: uuid.UUID, owner
 def _get_line_items(db: Session, invoice_id: uuid.UUID) -> list[InvoiceLineItem]:
     stmt = select(InvoiceLineItem).where(InvoiceLineItem.invoice_id == invoice_id)
     return list(db.execute(stmt).scalars().all())
+
+
+def _get_line_item_or_404(db: Session, invoice_id: uuid.UUID, line_item_id: uuid.UUID) -> InvoiceLineItem:
+    stmt = select(InvoiceLineItem).where(
+        InvoiceLineItem.id == line_item_id, InvoiceLineItem.invoice_id == invoice_id
+    )
+    line_item = db.execute(stmt).scalar_one_or_none()
+    if line_item is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Line item not found")
+    return line_item
 
 
 @router.post("", response_model=InvoiceOut, status_code=status.HTTP_201_CREATED)
@@ -121,6 +132,47 @@ def add_line_item(
     return line_item
 
 
+@router.patch("/{invoice_id}/line-items/{line_item_id}", response_model=LineItemOut)
+def update_line_item(
+    invoice_id: uuid.UUID,
+    line_item_id: uuid.UUID,
+    body: LineItemUpdate,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+) -> InvoiceLineItem:
+    invoice = _get_invoice_or_404(db, invoice_id)
+    if invoice.status != InvoiceStatus.DRAFT:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="Cannot modify line items on a non-draft invoice",
+        )
+
+    line_item = _get_line_item_or_404(db, invoice_id, line_item_id)
+    for field, value in body.model_dump(exclude_unset=True).items():
+        setattr(line_item, field, value)
+    db.flush()
+    return line_item
+
+
+@router.delete("/{invoice_id}/line-items/{line_item_id}", status_code=status.HTTP_204_NO_CONTENT)
+def delete_line_item(
+    invoice_id: uuid.UUID,
+    line_item_id: uuid.UUID,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+) -> None:
+    invoice = _get_invoice_or_404(db, invoice_id)
+    if invoice.status != InvoiceStatus.DRAFT:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="Cannot modify line items on a non-draft invoice",
+        )
+
+    line_item = _get_line_item_or_404(db, invoice_id, line_item_id)
+    db.delete(line_item)
+    db.flush()
+
+
 @router.patch("/{invoice_id}/status", response_model=InvoiceOut)
 def update_invoice_status(
     invoice_id: uuid.UUID,
@@ -143,6 +195,15 @@ def update_invoice_status(
                 detail="Cannot issue an invoice with no line items",
             )
         invoice.issued_at = datetime.now(UTC).replace(tzinfo=None)
+
+    if body.status == InvoiceStatus.PAID:
+        if body.payment_method is None:
+            raise HTTPException(
+                status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
+                detail="payment_method is required when marking an invoice as paid",
+            )
+        invoice.payment_method = body.payment_method
+        invoice.paid_at = datetime.now(UTC).replace(tzinfo=None)
 
     invoice.status = body.status
     db.flush()

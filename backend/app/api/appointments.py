@@ -13,6 +13,7 @@ from app.models.pet import Pet
 from app.models.user import User
 from app.schemas.appointment import (
     AppointmentCreate,
+    AppointmentNotesUpdate,
     AppointmentOut,
     AppointmentQueueStatus,
     AppointmentStatusUpdate,
@@ -189,6 +190,20 @@ def update_appointment(
 
     for field, value in updates.items():
         setattr(appointment, field, value)
+    db.flush()
+    return appointment
+
+
+@router.patch("/{appointment_id}/notes", response_model=AppointmentOut)
+def update_appointment_notes(
+    appointment_id: uuid.UUID,
+    body: AppointmentNotesUpdate,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+) -> Appointment:
+    """Visit notes are clinical documentation, not scheduling metadata - editable regardless of status."""
+    appointment = _get_appointment_or_404(db, appointment_id)
+    appointment.visit_notes = body.visit_notes
     db.flush()
     return appointment
 

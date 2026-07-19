@@ -1,6 +1,7 @@
 import { useEffect, useState, type FormEvent } from "react";
 import { useParams } from "react-router-dom";
 import { getAppointmentQueueStatus, type AppointmentQueueStatus } from "../api/appointments";
+import { statusPillClass } from "../lib/format";
 
 const STATUS_LABELS: Record<string, string> = {
   scheduled: "Scheduled",
@@ -44,8 +45,11 @@ export function CheckQueuePage() {
   }
 
   return (
-    <main className="page" style={{ maxWidth: 480 }}>
-      <h2>Check your queue number</h2>
+    <main className="page" style={{ maxWidth: 480, margin: "0 auto" }}>
+      <div className="brand" style={{ justifyContent: "center", marginBottom: 8 }}>
+        <span className="brand-mark">🐾</span> VetFlow
+      </div>
+      <h2 style={{ textAlign: "center" }}>Check your queue number</h2>
       <form onSubmit={handleSubmit}>
         <div className="field">
           <label htmlFor="appointment_id">Appointment ID</label>
@@ -66,7 +70,10 @@ export function CheckQueuePage() {
       {result && (
         <div className="card" style={{ marginTop: 24 }}>
           <p>
-            Status: <span className="status-pill">{STATUS_LABELS[result.status] ?? result.status}</span>
+            Status:{" "}
+            <span className={`status-pill ${statusPillClass(result.status)}`}>
+              {STATUS_LABELS[result.status] ?? result.status}
+            </span>
           </p>
           {result.status === "checked_in" && result.position !== null ? (
             <p>

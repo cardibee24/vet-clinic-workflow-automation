@@ -4,6 +4,7 @@ import { useToken } from "../auth/AuthContext";
 import { createInvoice, deleteInvoice, listInvoices, type Invoice, type InvoiceStatus } from "../api/invoices";
 import { listOwners, type Owner } from "../api/owners";
 import { useAppointmentDirectory } from "../hooks/useAppointmentDirectory";
+import { statusPillClass } from "../lib/format";
 
 const STATUS_LABELS: Record<InvoiceStatus, string> = {
   draft: "Draft",
@@ -30,6 +31,9 @@ export function InvoicesPage() {
   const [rowError, setRowError] = useState<string | null>(null);
   const [deletingId, setDeletingId] = useState<string | null>(null);
 
+  const [search, setSearch] = useState("");
+  const [statusFilter, setStatusFilter] = useState<InvoiceStatus | "all">("all");
+
   function refresh() {
     setLoading(true);
     Promise.all([listInvoices(token), listOwners(token)])
@@ -46,6 +50,14 @@ export function InvoicesPage() {
 
   const ownersById = new Map(owners.map((owner) => [owner.id, `${owner.first_name} ${owner.last_name}`]));
   const appointmentsForOwner = appointments.filter((appointment) => appointment.ownerId === ownerId);
+
+  const query = search.trim().toLowerCase();
+  const visibleInvoices = invoices.filter((invoice) => {
+    if (statusFilter !== "all" && invoice.status !== statusFilter) return false;
+    if (!query) return true;
+    const ownerName = ownersById.get(invoice.owner_id);
+    return [ownerName, invoice.notes].some((field) => field?.toLowerCase().includes(query));
+  });
 
   async function handleSubmit(event: FormEvent) {
     event.preventDefault();
@@ -149,6 +161,33 @@ export function InvoicesPage() {
       {loadError && <p className="error-text">{loadError}</p>}
       {rowError && <p className="error-text">{rowError}</p>}
       {!loading && !loadError && (
+        <>
+          <div className="form-grid" style={{ marginBottom: 12, maxWidth: 480 }}>
+            <div className="field">
+              <label htmlFor="invoice_search">Search</label>
+              <input
+                id="invoice_search"
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+                placeholder="Owner or notes"
+              />
+            </div>
+            <div className="field">
+              <label htmlFor="invoice_status_filter">Status</label>
+              <select
+                id="invoice_status_filter"
+                value={statusFilter}
+                onChange={(e) => setStatusFilter(e.target.value as InvoiceStatus | "all")}
+              >
+                <option value="all">All</option>
+                {Object.entries(STATUS_LABELS).map(([value, label]) => (
+                  <option key={value} value={value}>
+                    {label}
+                  </option>
+                ))}
+              </select>
+            </div>
+          </div>
         <table>
           <thead>
             <tr>
@@ -160,11 +199,13 @@ export function InvoicesPage() {
             </tr>
           </thead>
           <tbody>
-            {invoices.map((invoice) => (
+            {visibleInvoices.map((invoice) => (
               <tr key={invoice.id}>
                 <td>{ownersById.get(invoice.owner_id) ?? invoice.owner_id}</td>
                 <td>
-                  <span className="status-pill">{STATUS_LABELS[invoice.status]}</span>
+                  <span className={`status-pill ${statusPillClass(invoice.status)}`}>
+                    {STATUS_LABELS[invoice.status]}
+                  </span>
                 </td>
                 <td>{invoice.due_date ?? "—"}</td>
                 <td>{invoice.notes ?? "—"}</td>
@@ -185,15 +226,16 @@ export function InvoicesPage() {
                 </td>
               </tr>
             ))}
-            {invoices.length === 0 && (
+            {visibleInvoices.length === 0 && (
               <tr>
                 <td colSpan={5} className="muted">
-                  No invoices yet.
+                  {invoices.length === 0 ? "No invoices yet." : "No invoices match your filters."}
                 </td>
               </tr>
             )}
           </tbody>
         </table>
+        </>
       )}
     </section>
   );

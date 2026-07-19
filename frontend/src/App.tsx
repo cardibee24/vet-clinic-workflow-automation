@@ -6,6 +6,7 @@ import { LoginPage } from "./pages/LoginPage";
 import { DashboardPage } from "./pages/DashboardPage";
 import { OwnersPage } from "./pages/OwnersPage";
 import { OwnerDetailPage } from "./pages/OwnerDetailPage";
+import { PetDetailPage } from "./pages/PetDetailPage";
 import { AppointmentsPage } from "./pages/AppointmentsPage";
 import { InvoicesPage } from "./pages/InvoicesPage";
 import { InvoiceDetailPage } from "./pages/InvoiceDetailPage";
@@ -28,6 +29,7 @@ function App() {
               <Route path="dashboard" element={<DashboardPage />} />
               <Route path="owners" element={<OwnersPage />} />
               <Route path="owners/:ownerId" element={<OwnerDetailPage />} />
+              <Route path="pets/:petId" element={<PetDetailPage />} />
               <Route path="appointments" element={<AppointmentsPage />} />
               <Route path="invoices" element={<InvoicesPage />} />
               <Route path="invoices/:invoiceId" element={<InvoiceDetailPage />} />

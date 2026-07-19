@@ -52,8 +52,11 @@ export function SelfCheckInPage() {
   }
 
   return (
-    <main className="page" style={{ maxWidth: 480 }}>
-      <h2>Self check-in</h2>
+    <main className="page" style={{ maxWidth: 480, margin: "0 auto" }}>
+      <div className="brand" style={{ justifyContent: "center", marginBottom: 8 }}>
+        <span className="brand-mark">🐾</span> VetFlow
+      </div>
+      <h2 style={{ textAlign: "center" }}>Self check-in</h2>
 
       {!searched && (
         <form onSubmit={handleSearch}>

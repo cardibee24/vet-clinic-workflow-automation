@@ -53,3 +53,4 @@ class Appointment(Base, UUIDPKMixin, TimestampMixin):
         nullable=True,
     )
     checked_in_at: Mapped[datetime | None] = mapped_column(nullable=True)
+    visit_notes: Mapped[str | None] = mapped_column(nullable=True)

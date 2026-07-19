@@ -16,6 +16,13 @@ class InvoiceStatus(str, enum.Enum):
     VOID = "void"
 
 
+class PaymentMethod(str, enum.Enum):
+    CASH = "cash"
+    CARD = "card"
+    BANK_TRANSFER = "bank_transfer"
+    OTHER = "other"
+
+
 class Invoice(Base, UUIDPKMixin, TimestampMixin):
     __tablename__ = "invoices"
 
@@ -34,6 +41,15 @@ class Invoice(Base, UUIDPKMixin, TimestampMixin):
     issued_at: Mapped[datetime | None] = mapped_column(nullable=True)
     due_date: Mapped[date | None] = mapped_column(nullable=True)
     notes: Mapped[str | None] = mapped_column(nullable=True)
+    paid_at: Mapped[datetime | None] = mapped_column(nullable=True)
+    payment_method: Mapped[PaymentMethod | None] = mapped_column(
+        Enum(
+            PaymentMethod,
+            name="payment_method",
+            values_callable=lambda enum_cls: [e.value for e in enum_cls],
+        ),
+        nullable=True,
+    )
 
 
 class InvoiceLineItem(Base, UUIDPKMixin, TimestampMixin):

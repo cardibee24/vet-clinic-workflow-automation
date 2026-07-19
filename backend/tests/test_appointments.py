@@ -180,6 +180,57 @@ def test_update_appointment_blocked_when_completed(client, auth_headers, pet):
     assert response.status_code == 409
 
 
+def test_update_appointment_notes(client, auth_headers, pet):
+    create = client.post(
+        "/api/appointments",
+        json={"pet_id": str(pet.id), "scheduled_at": _scheduled_at().isoformat()},
+        headers=auth_headers,
+    )
+    appointment_id = create.json()["id"]
+    assert create.json()["visit_notes"] is None
+
+    response = client.patch(
+        f"/api/appointments/{appointment_id}/notes",
+        json={"visit_notes": "Ears look inflamed, prescribed drops"},
+        headers=auth_headers,
+    )
+    assert response.status_code == 200
+    assert response.json()["visit_notes"] == "Ears look inflamed, prescribed drops"
+
+
+def test_update_appointment_notes_allowed_when_completed(client, auth_headers, pet):
+    create = client.post(
+        "/api/appointments",
+        json={"pet_id": str(pet.id), "scheduled_at": _scheduled_at().isoformat()},
+        headers=auth_headers,
+    )
+    appointment_id = create.json()["id"]
+    client.patch(f"/api/appointments/{appointment_id}/status", json={"status": "checked_in"}, headers=auth_headers)
+    client.patch(f"/api/appointments/{appointment_id}/status", json={"status": "in_progress"}, headers=auth_headers)
+    client.patch(f"/api/appointments/{appointment_id}/status", json={"status": "completed"}, headers=auth_headers)
+
+    response = client.patch(
+        f"/api/appointments/{appointment_id}/notes",
+        json={"visit_notes": "Follow-up in two weeks"},
+        headers=auth_headers,
+    )
+    assert response.status_code == 200
+    assert response.json()["visit_notes"] == "Follow-up in two weeks"
+
+
+def test_update_appointment_notes_requires_auth(client, pet):
+    create_headers = {}
+    response = client.patch(f"/api/appointments/{uuid.uuid4()}/notes", json={"visit_notes": "x"}, headers=create_headers)
+    assert response.status_code == 401
+
+
+def test_update_appointment_notes_not_found(client, auth_headers):
+    response = client.patch(
+        f"/api/appointments/{uuid.uuid4()}/notes", json={"visit_notes": "x"}, headers=auth_headers
+    )
+    assert response.status_code == 404
+
+
 def test_check_in_then_complete_appointment(client, auth_headers, pet):
     create = client.post(
         "/api/appointments",

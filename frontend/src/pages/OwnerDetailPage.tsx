@@ -195,7 +195,9 @@ export function OwnerDetailPage() {
               </tr>
             ) : (
               <tr key={pet.id}>
-                <td>{pet.name}</td>
+                <td>
+                  <Link to={`/pets/${pet.id}`}>{pet.name}</Link>
+                </td>
                 <td>{pet.species}</td>
                 <td>{pet.breed ?? "—"}</td>
                 <td>{pet.date_of_birth ?? "—"}</td>

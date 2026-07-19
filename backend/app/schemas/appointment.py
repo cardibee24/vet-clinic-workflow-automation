@@ -21,6 +21,7 @@ class AppointmentOut(BaseModel):
     status: AppointmentStatus
     reason: AppointmentReason | None
     checked_in_at: datetime | None
+    visit_notes: str | None
 
     model_config = {"from_attributes": True}
 
@@ -33,6 +34,10 @@ class AppointmentUpdate(BaseModel):
 
 class AppointmentStatusUpdate(BaseModel):
     status: AppointmentStatus
+
+
+class AppointmentNotesUpdate(BaseModel):
+    visit_notes: str | None = None
 
 
 class SelfCheckInRequest(BaseModel):

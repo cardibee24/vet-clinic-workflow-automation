@@ -138,6 +138,102 @@ def test_add_line_item_rejects_nondraft_invoice(client, auth_headers, owner):
     assert response.status_code == 409
 
 
+def test_update_line_item(client, auth_headers, owner):
+    create = client.post("/api/invoices", json={"owner_id": str(owner.id)}, headers=auth_headers)
+    invoice_id = create.json()["id"]
+    line_item = client.post(
+        f"/api/invoices/{invoice_id}/line-items",
+        json={"description": "Exam fee", "quantity": 1, "unit_price_cents": 5000},
+        headers=auth_headers,
+    ).json()
+
+    response = client.patch(
+        f"/api/invoices/{invoice_id}/line-items/{line_item['id']}",
+        json={"quantity": 3, "unit_price_cents": 1000},
+        headers=auth_headers,
+    )
+    assert response.status_code == 200
+    body = response.json()
+    assert body["description"] == "Exam fee"
+    assert body["quantity"] == 3
+    assert body["unit_price_cents"] == 1000
+    assert body["amount_cents"] == 3000
+
+
+def test_update_line_item_rejects_nondraft_invoice(client, auth_headers, owner):
+    create = client.post("/api/invoices", json={"owner_id": str(owner.id)}, headers=auth_headers)
+    invoice_id = create.json()["id"]
+    line_item = client.post(
+        f"/api/invoices/{invoice_id}/line-items",
+        json={"description": "Exam fee", "quantity": 1, "unit_price_cents": 5000},
+        headers=auth_headers,
+    ).json()
+    client.patch(f"/api/invoices/{invoice_id}/status", json={"status": "issued"}, headers=auth_headers)
+
+    response = client.patch(
+        f"/api/invoices/{invoice_id}/line-items/{line_item['id']}",
+        json={"quantity": 2},
+        headers=auth_headers,
+    )
+    assert response.status_code == 409
+
+
+def test_update_line_item_not_found(client, auth_headers, owner):
+    create = client.post("/api/invoices", json={"owner_id": str(owner.id)}, headers=auth_headers)
+    invoice_id = create.json()["id"]
+
+    response = client.patch(
+        f"/api/invoices/{invoice_id}/line-items/{uuid.uuid4()}",
+        json={"quantity": 2},
+        headers=auth_headers,
+    )
+    assert response.status_code == 404
+
+
+def test_delete_line_item(client, auth_headers, owner):
+    create = client.post("/api/invoices", json={"owner_id": str(owner.id)}, headers=auth_headers)
+    invoice_id = create.json()["id"]
+    line_item = client.post(
+        f"/api/invoices/{invoice_id}/line-items",
+        json={"description": "Exam fee", "quantity": 1, "unit_price_cents": 5000},
+        headers=auth_headers,
+    ).json()
+
+    response = client.delete(
+        f"/api/invoices/{invoice_id}/line-items/{line_item['id']}", headers=auth_headers
+    )
+    assert response.status_code == 204
+
+    invoice = client.get(f"/api/invoices/{invoice_id}", headers=auth_headers).json()
+    assert invoice["line_items"] == []
+
+
+def test_delete_line_item_rejects_nondraft_invoice(client, auth_headers, owner):
+    create = client.post("/api/invoices", json={"owner_id": str(owner.id)}, headers=auth_headers)
+    invoice_id = create.json()["id"]
+    line_item = client.post(
+        f"/api/invoices/{invoice_id}/line-items",
+        json={"description": "Exam fee", "quantity": 1, "unit_price_cents": 5000},
+        headers=auth_headers,
+    ).json()
+    client.patch(f"/api/invoices/{invoice_id}/status", json={"status": "issued"}, headers=auth_headers)
+
+    response = client.delete(
+        f"/api/invoices/{invoice_id}/line-items/{line_item['id']}", headers=auth_headers
+    )
+    assert response.status_code == 409
+
+
+def test_delete_line_item_not_found(client, auth_headers, owner):
+    create = client.post("/api/invoices", json={"owner_id": str(owner.id)}, headers=auth_headers)
+    invoice_id = create.json()["id"]
+
+    response = client.delete(
+        f"/api/invoices/{invoice_id}/line-items/{uuid.uuid4()}", headers=auth_headers
+    )
+    assert response.status_code == 404
+
+
 def test_issue_then_pay_invoice(client, auth_headers, owner):
     create = client.post("/api/invoices", json={"owner_id": str(owner.id)}, headers=auth_headers)
     invoice_id = create.json()["id"]
@@ -152,9 +248,29 @@ def test_issue_then_pay_invoice(client, auth_headers, owner):
     assert issued.json()["status"] == "issued"
     assert issued.json()["issued_at"] is not None
 
-    paid = client.patch(f"/api/invoices/{invoice_id}/status", json={"status": "paid"}, headers=auth_headers)
+    paid = client.patch(
+        f"/api/invoices/{invoice_id}/status",
+        json={"status": "paid", "payment_method": "card"},
+        headers=auth_headers,
+    )
     assert paid.status_code == 200
     assert paid.json()["status"] == "paid"
+    assert paid.json()["payment_method"] == "card"
+    assert paid.json()["paid_at"] is not None
+
+
+def test_mark_paid_requires_payment_method(client, auth_headers, owner):
+    create = client.post("/api/invoices", json={"owner_id": str(owner.id)}, headers=auth_headers)
+    invoice_id = create.json()["id"]
+    client.post(
+        f"/api/invoices/{invoice_id}/line-items",
+        json={"description": "Exam fee", "quantity": 1, "unit_price_cents": 5000},
+        headers=auth_headers,
+    )
+    client.patch(f"/api/invoices/{invoice_id}/status", json={"status": "issued"}, headers=auth_headers)
+
+    response = client.patch(f"/api/invoices/{invoice_id}/status", json={"status": "paid"}, headers=auth_headers)
+    assert response.status_code == 422
 
 
 def test_issue_invoice_rejects_empty_line_items(client, auth_headers, owner):

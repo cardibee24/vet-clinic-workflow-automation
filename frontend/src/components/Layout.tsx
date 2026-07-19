@@ -8,6 +8,9 @@ export function Layout() {
   return (
     <>
       <nav className="app-nav">
+        <NavLink to="/dashboard" className="brand">
+          <span className="brand-mark">🐾</span> VetFlow
+        </NavLink>
         <NavLink to="/dashboard" className={({ isActive }) => (isActive ? "active" : undefined)}>
           Dashboard
         </NavLink>
