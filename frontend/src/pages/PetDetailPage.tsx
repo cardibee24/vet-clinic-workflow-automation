@@ -69,7 +69,8 @@ export function PetDetailPage() {
             <th>Date &amp; time</th>
             <th>Status</th>
             <th>Reason</th>
-            <th>Visit notes</th>
+            <th>Description</th>
+            <th>Prescription</th>
           </tr>
         </thead>
         <tbody>
@@ -81,11 +82,12 @@ export function PetDetailPage() {
               </td>
               <td>{visit.reason ? APPOINTMENT_REASON_LABELS[visit.reason] : "—"}</td>
               <td>{visit.visit_notes ?? "—"}</td>
+              <td>{visit.prescription ?? "—"}</td>
             </tr>
           ))}
           {visits.length === 0 && (
             <tr>
-              <td colSpan={4} className="muted">
+              <td colSpan={5} className="muted">
                 No visits recorded yet.
               </td>
             </tr>

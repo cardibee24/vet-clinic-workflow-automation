@@ -6,6 +6,7 @@ import pytest
 from app.models.appointment import Appointment
 from app.models.owner import Owner
 from app.models.pet import Pet
+from app.schemas.invoice import LineItemCreate
 
 
 @pytest.fixture()
@@ -71,6 +72,176 @@ def test_create_invoice_with_appointment(client, auth_headers, owner, appointmen
     assert response.json()["appointment_id"] == str(appointment.id)
 
 
+def test_create_invoice_with_appointment_auto_drafts_line_items(client, auth_headers, db_session, owner, appointment, monkeypatch):
+    appointment.visit_notes = "Checkup, diagnosed with ear mites"
+    appointment.prescription = "Antifungal cream"
+    db_session.flush()
+
+    def fake_draft_line_items(notes, catalog):
+        assert "Checkup, diagnosed with ear mites" in notes
+        assert "Antifungal cream" in notes
+        return [
+            LineItemCreate(description="Consultation fee", quantity=1, unit_price_cents=5000),
+            LineItemCreate(description="Antifungal cream", quantity=1, unit_price_cents=1500),
+        ]
+
+    monkeypatch.setattr("app.api.invoices.draft_line_items", fake_draft_line_items)
+
+    create = client.post(
+        "/api/invoices",
+        json={"owner_id": str(owner.id), "appointment_id": str(appointment.id)},
+        headers=auth_headers,
+    )
+    assert create.status_code == 201
+    invoice_id = create.json()["id"]
+
+    response = client.get(f"/api/invoices/{invoice_id}", headers=auth_headers)
+    descriptions = {item["description"] for item in response.json()["line_items"]}
+    assert descriptions == {"Consultation fee", "Antifungal cream"}
+
+
+def test_create_invoice_with_appointment_without_notes_has_no_line_items(client, auth_headers, owner, appointment):
+    create = client.post(
+        "/api/invoices",
+        json={"owner_id": str(owner.id), "appointment_id": str(appointment.id)},
+        headers=auth_headers,
+    )
+    assert create.status_code == 201
+    invoice_id = create.json()["id"]
+
+    response = client.get(f"/api/invoices/{invoice_id}", headers=auth_headers)
+    assert response.json()["line_items"] == []
+
+
+def test_create_invoice_auto_draft_failure_does_not_block_creation(
+    client, auth_headers, db_session, owner, appointment, monkeypatch
+):
+    appointment.visit_notes = "Checkup, diagnosed with ear mites"
+    db_session.flush()
+
+    def fake_draft_line_items(notes, catalog):
+        raise RuntimeError("no API key configured")
+
+    monkeypatch.setattr("app.api.invoices.draft_line_items", fake_draft_line_items)
+
+    create = client.post(
+        "/api/invoices",
+        json={"owner_id": str(owner.id), "appointment_id": str(appointment.id)},
+        headers=auth_headers,
+    )
+    assert create.status_code == 201
+    invoice_id = create.json()["id"]
+
+    response = client.get(f"/api/invoices/{invoice_id}", headers=auth_headers)
+    assert response.json()["line_items"] == []
+
+
+def test_retry_auto_draft_backfills_line_items(client, auth_headers, db_session, owner, appointment, monkeypatch):
+    create = client.post(
+        "/api/invoices",
+        json={"owner_id": str(owner.id), "appointment_id": str(appointment.id)},
+        headers=auth_headers,
+    )
+    invoice_id = create.json()["id"]
+
+    # Notes only get written after the invoice already exists (e.g. vet finishes charting later).
+    appointment.visit_notes = "Checkup, diagnosed with ear mites"
+    appointment.prescription = "Antifungal cream"
+    db_session.flush()
+
+    def fake_draft_line_items(notes, catalog):
+        return [LineItemCreate(description="Antifungal cream", quantity=1, unit_price_cents=1500)]
+
+    monkeypatch.setattr("app.api.invoices.draft_line_items", fake_draft_line_items)
+
+    response = client.post(f"/api/invoices/{invoice_id}/auto-draft-line-items", headers=auth_headers)
+    assert response.status_code == 200
+    descriptions = {item["description"] for item in response.json()["line_items"]}
+    assert descriptions == {"Antifungal cream"}
+
+
+def test_retry_auto_draft_is_noop_when_notes_unchanged(client, auth_headers, db_session, owner, appointment, monkeypatch):
+    appointment.visit_notes = "Checkup, diagnosed with ear mites"
+    db_session.flush()
+
+    calls = []
+
+    def fake_draft_line_items(notes, catalog):
+        calls.append(notes)
+        return [LineItemCreate(description="Consultation fee", quantity=1, unit_price_cents=5000)]
+
+    monkeypatch.setattr("app.api.invoices.draft_line_items", fake_draft_line_items)
+
+    create = client.post(
+        "/api/invoices",
+        json={"owner_id": str(owner.id), "appointment_id": str(appointment.id)},
+        headers=auth_headers,
+    )
+    invoice_id = create.json()["id"]
+    assert len(calls) == 1  # drafted once at creation
+
+    # Notes haven't changed since - a sync call should be a no-op.
+    response = client.post(f"/api/invoices/{invoice_id}/auto-draft-line-items", headers=auth_headers)
+    assert response.status_code == 200
+    assert len(calls) == 1
+    descriptions = {item["description"] for item in response.json()["line_items"]}
+    assert descriptions == {"Consultation fee"}
+
+
+def test_retry_auto_draft_syncs_when_notes_change_without_duplicating(
+    client, auth_headers, db_session, owner, appointment, monkeypatch
+):
+    appointment.visit_notes = "Checkup, diagnosed with ear mites"
+    db_session.flush()
+
+    monkeypatch.setattr(
+        "app.api.invoices.draft_line_items",
+        lambda notes, catalog: [LineItemCreate(description="Consultation fee", quantity=1, unit_price_cents=5000)],
+    )
+
+    create = client.post(
+        "/api/invoices",
+        json={"owner_id": str(owner.id), "appointment_id": str(appointment.id)},
+        headers=auth_headers,
+    )
+    invoice_id = create.json()["id"]
+
+    # Staff adds a manual charge on top of the AI-drafted one.
+    client.post(
+        f"/api/invoices/{invoice_id}/line-items",
+        json={"description": "Manual charge", "quantity": 1, "unit_price_cents": 2000},
+        headers=auth_headers,
+    )
+
+    # Vet adds more to the notes after the invoice already has line items.
+    appointment.visit_notes = "Checkup, diagnosed with ear mites. Gave antifungal cream."
+    db_session.flush()
+
+    monkeypatch.setattr(
+        "app.api.invoices.draft_line_items",
+        lambda notes, catalog: [
+            LineItemCreate(description="Consultation fee", quantity=1, unit_price_cents=5000),
+            LineItemCreate(description="Antifungal cream", quantity=1, unit_price_cents=1500),
+        ],
+    )
+
+    response = client.post(f"/api/invoices/{invoice_id}/auto-draft-line-items", headers=auth_headers)
+    assert response.status_code == 200
+    descriptions = {item["description"] for item in response.json()["line_items"]}
+    # Consultation fee isn't duplicated; the manual charge is untouched; the new item is added.
+    assert descriptions == {"Consultation fee", "Manual charge", "Antifungal cream"}
+
+    # Calling again with the same notes is a no-op - no duplicate items appear.
+    response2 = client.post(f"/api/invoices/{invoice_id}/auto-draft-line-items", headers=auth_headers)
+    descriptions2 = [item["description"] for item in response2.json()["line_items"]]
+    assert len(descriptions2) == len(set(descriptions2)) == 3
+
+
+def test_retry_auto_draft_not_found(client, auth_headers):
+    response = client.post(f"/api/invoices/{uuid.uuid4()}/auto-draft-line-items", headers=auth_headers)
+    assert response.status_code == 404
+
+
 def test_create_invoice_rejects_appointment_belonging_to_other_owner(
     client, auth_headers, other_owner, appointment
 ):
@@ -89,7 +260,56 @@ def test_list_invoices(client, auth_headers, owner):
     response = client.get("/api/invoices", headers=auth_headers)
     assert response.status_code == 200
     body = response.json()
-    assert invoice_id in [invoice["id"] for invoice in body]
+    listed = next(invoice for invoice in body if invoice["id"] == invoice_id)
+    assert listed["total_cents"] == 0
+
+
+def test_list_invoices_includes_total_cents(client, auth_headers, owner):
+    create = client.post("/api/invoices", json={"owner_id": str(owner.id)}, headers=auth_headers)
+    invoice_id = create.json()["id"]
+    client.post(
+        f"/api/invoices/{invoice_id}/line-items",
+        json={"description": "Exam fee", "quantity": 1, "unit_price_cents": 5000},
+        headers=auth_headers,
+    )
+    client.post(
+        f"/api/invoices/{invoice_id}/line-items",
+        json={"description": "Vaccine", "quantity": 2, "unit_price_cents": 2500},
+        headers=auth_headers,
+    )
+
+    response = client.get("/api/invoices", headers=auth_headers)
+    assert response.status_code == 200
+    listed = next(invoice for invoice in response.json() if invoice["id"] == invoice_id)
+    assert listed["total_cents"] == 10000
+
+
+def test_common_line_items_ranked_by_frequency(client, auth_headers, owner):
+    create = client.post("/api/invoices", json={"owner_id": str(owner.id)}, headers=auth_headers)
+    invoice_id = create.json()["id"]
+    for unit_price in (5000, 5000, 5000, 7000):
+        client.post(
+            f"/api/invoices/{invoice_id}/line-items",
+            json={"description": "Exam fee", "quantity": 1, "unit_price_cents": unit_price},
+            headers=auth_headers,
+        )
+    client.post(
+        f"/api/invoices/{invoice_id}/line-items",
+        json={"description": "Vaccine", "quantity": 1, "unit_price_cents": 2500},
+        headers=auth_headers,
+    )
+
+    response = client.get("/api/invoices/common-line-items", headers=auth_headers)
+    assert response.status_code == 200
+    body = response.json()
+    assert body[0]["description"] == "Exam fee"
+    assert body[0]["unit_price_cents"] == 5000
+    assert any(item["description"] == "Vaccine" for item in body)
+
+
+def test_common_line_items_requires_auth(client):
+    response = client.get("/api/invoices/common-line-items")
+    assert response.status_code == 401
 
 
 def test_get_invoice_includes_line_items_and_total(client, auth_headers, owner):
@@ -343,7 +563,7 @@ def test_delete_invoice_not_found(client, auth_headers):
     assert response.status_code == 404
 
 
-def test_delete_invoice_blocked_once_issued(client, auth_headers, owner):
+def test_delete_invoice_allowed_when_issued(client, auth_headers, owner):
     create = client.post("/api/invoices", json={"owner_id": str(owner.id)}, headers=auth_headers)
     invoice_id = create.json()["id"]
     client.post(
@@ -354,4 +574,61 @@ def test_delete_invoice_blocked_once_issued(client, auth_headers, owner):
     client.patch(f"/api/invoices/{invoice_id}/status", json={"status": "issued"}, headers=auth_headers)
 
     response = client.delete(f"/api/invoices/{invoice_id}", headers=auth_headers)
-    assert response.status_code == 409
+    assert response.status_code == 204
+
+    response = client.get(f"/api/invoices/{invoice_id}", headers=auth_headers)
+    assert response.status_code == 404
+
+
+def test_delete_invoice_allowed_when_paid(client, auth_headers, owner):
+    create = client.post("/api/invoices", json={"owner_id": str(owner.id)}, headers=auth_headers)
+    invoice_id = create.json()["id"]
+    client.post(
+        f"/api/invoices/{invoice_id}/line-items",
+        json={"description": "Exam fee", "quantity": 1, "unit_price_cents": 5000},
+        headers=auth_headers,
+    )
+    client.patch(f"/api/invoices/{invoice_id}/status", json={"status": "issued"}, headers=auth_headers)
+    client.patch(
+        f"/api/invoices/{invoice_id}/status",
+        json={"status": "paid", "payment_method": "cash"},
+        headers=auth_headers,
+    )
+
+    response = client.delete(f"/api/invoices/{invoice_id}", headers=auth_headers)
+    assert response.status_code == 204
+
+
+def test_draft_line_items(client, auth_headers, monkeypatch):
+    def fake_draft_line_items(notes, catalog):
+        assert notes == "Gave rabies vaccine"
+        return [LineItemCreate(description="Rabies vaccine", quantity=1, unit_price_cents=4500)]
+
+    monkeypatch.setattr("app.api.invoices.draft_line_items", fake_draft_line_items)
+
+    response = client.post(
+        "/api/invoices/draft-line-items",
+        json={"notes": "Gave rabies vaccine"},
+        headers=auth_headers,
+    )
+    assert response.status_code == 200
+    assert response.json() == [{"description": "Rabies vaccine", "quantity": 1, "unit_price_cents": 4500}]
+
+
+def test_draft_line_items_requires_auth(client):
+    response = client.post("/api/invoices/draft-line-items", json={"notes": "Gave rabies vaccine"})
+    assert response.status_code == 401
+
+
+def test_draft_line_items_returns_503_on_llm_failure(client, auth_headers, monkeypatch):
+    def fake_draft_line_items(notes, catalog):
+        raise RuntimeError("no API key configured")
+
+    monkeypatch.setattr("app.api.invoices.draft_line_items", fake_draft_line_items)
+
+    response = client.post(
+        "/api/invoices/draft-line-items",
+        json={"notes": "Gave rabies vaccine"},
+        headers=auth_headers,
+    )
+    assert response.status_code == 503

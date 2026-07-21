@@ -6,7 +6,7 @@ import { APPOINTMENT_REASON_LABELS, getQueue, type QueueSummary } from "../api/a
 import { listInvoices, type Invoice } from "../api/invoices";
 import { listOwners, type Owner } from "../api/owners";
 import { useAppointmentDirectory } from "../hooks/useAppointmentDirectory";
-import { formatDateTime, isToday, statusPillClass } from "../lib/format";
+import { formatDateTime, formatMoney, isToday, statusPillClass } from "../lib/format";
 
 function todayDateString(): string {
   const now = new Date();
@@ -166,6 +166,7 @@ export function DashboardPage() {
             <thead>
               <tr>
                 <th>Owner</th>
+                <th>Total</th>
                 <th>Due date</th>
                 <th></th>
               </tr>
@@ -174,6 +175,7 @@ export function DashboardPage() {
               {overdueInvoices.map((invoice) => (
                 <tr key={invoice.id}>
                   <td>{ownersById.get(invoice.owner_id) ?? invoice.owner_id}</td>
+                  <td>{formatMoney(invoice.total_cents)}</td>
                   <td>{invoice.due_date}</td>
                   <td>
                     <Link to={`/invoices/${invoice.id}`} className="secondary">
@@ -184,7 +186,7 @@ export function DashboardPage() {
               ))}
               {overdueInvoices.length === 0 && (
                 <tr>
-                  <td colSpan={3} className="muted">
+                  <td colSpan={4} className="muted">
                     No overdue invoices.
                   </td>
                 </tr>

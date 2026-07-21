@@ -8,6 +8,7 @@ import { OwnersPage } from "./pages/OwnersPage";
 import { OwnerDetailPage } from "./pages/OwnerDetailPage";
 import { PetDetailPage } from "./pages/PetDetailPage";
 import { AppointmentsPage } from "./pages/AppointmentsPage";
+import { AppointmentDetailPage } from "./pages/AppointmentDetailPage";
 import { InvoicesPage } from "./pages/InvoicesPage";
 import { InvoiceDetailPage } from "./pages/InvoiceDetailPage";
 import { InvoicePrintPage } from "./pages/InvoicePrintPage";
@@ -33,6 +34,7 @@ function App() {
               <Route path="owners/:ownerId" element={<OwnerDetailPage />} />
               <Route path="pets/:petId" element={<PetDetailPage />} />
               <Route path="appointments" element={<AppointmentsPage />} />
+              <Route path="appointments/:appointmentId" element={<AppointmentDetailPage />} />
               <Route path="invoices" element={<InvoicesPage />} />
               <Route path="invoices/:invoiceId" element={<InvoiceDetailPage />} />
               <Route path="queue" element={<QueuePage />} />

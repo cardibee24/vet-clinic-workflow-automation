@@ -52,7 +52,7 @@ export function InvoicePrintPage() {
       <div className="print-sheet">
         <div className="print-header">
           <div className="brand">
-            <span className="brand-mark">🐾</span> VetFlow
+            VetFlow
           </div>
           <div className="print-invoice-meta">
             <div>

@@ -1,5 +1,5 @@
-import { useEffect, useState, type FormEvent } from "react";
-import { Link, useParams } from "react-router-dom";
+import { useEffect, useRef, useState, type FormEvent } from "react";
+import { Link, useParams, useSearchParams } from "react-router-dom";
 import { useToken } from "../auth/AuthContext";
 import { addPet, getOwner, type OwnerWithPets } from "../api/owners";
 import { deletePet, updatePet } from "../api/pets";
@@ -14,6 +14,8 @@ interface PetEditState {
 export function OwnerDetailPage() {
   const token = useToken();
   const { ownerId } = useParams<{ ownerId: string }>();
+  const [searchParams, setSearchParams] = useSearchParams();
+  const addPetNameRef = useRef<HTMLInputElement>(null);
 
   const [owner, setOwner] = useState<OwnerWithPets | null>(null);
   const [loading, setLoading] = useState(true);
@@ -45,6 +47,15 @@ export function OwnerDetailPage() {
   }
 
   useEffect(refresh, [token, ownerId]);
+
+  useEffect(() => {
+    if (!loading && searchParams.get("addPet")) {
+      addPetNameRef.current?.scrollIntoView({ behavior: "smooth", block: "center" });
+      addPetNameRef.current?.focus();
+      setSearchParams({}, { replace: true });
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [loading]);
 
   async function handleSubmit(event: FormEvent) {
     event.preventDefault();
@@ -229,12 +240,18 @@ export function OwnerDetailPage() {
         </tbody>
       </table>
 
-      <form className="card" onSubmit={handleSubmit} style={{ marginTop: 24 }}>
+      <form className="card" onSubmit={handleSubmit}>
         <h3>Add a pet</h3>
         <div className="form-grid">
           <div className="field">
             <label htmlFor="pet_name">Name</label>
-            <input id="pet_name" value={name} onChange={(e) => setName(e.target.value)} required />
+            <input
+              id="pet_name"
+              ref={addPetNameRef}
+              value={name}
+              onChange={(e) => setName(e.target.value)}
+              required
+            />
           </div>
           <div className="field">
             <label htmlFor="species">Species</label>

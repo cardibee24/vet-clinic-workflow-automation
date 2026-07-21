@@ -1,12 +1,9 @@
-import { Fragment, useState, type FormEvent } from "react";
+import { useMemo, useState, type FormEvent } from "react";
 import { Link } from "react-router-dom";
 import { useToken } from "../auth/AuthContext";
 import {
   APPOINTMENT_REASON_LABELS,
   createAppointment,
-  deleteAppointment,
-  updateAppointment,
-  updateAppointmentNotes,
   updateAppointmentStatus,
   type AppointmentReason,
   type AppointmentStatus,
@@ -31,8 +28,6 @@ const ALLOWED_TRANSITIONS: Record<AppointmentStatus, AppointmentStatus[]> = {
   no_show: [],
 };
 
-const TERMINAL_STATUSES: AppointmentStatus[] = ["completed", "cancelled", "no_show"];
-
 const STATUS_LABELS: Record<AppointmentStatus, string> = {
   scheduled: "Scheduled",
   checked_in: "Checked in",
@@ -48,21 +43,13 @@ export function AppointmentsPage() {
   const petDirectory = usePetDirectory(token);
 
   const [petId, setPetId] = useState("");
+  const [petQuery, setPetQuery] = useState("");
+  const [petDropdownOpen, setPetDropdownOpen] = useState(false);
   const [scheduledAt, setScheduledAt] = useState("");
   const [reason, setReason] = useState<AppointmentReason | "">("");
   const [submitting, setSubmitting] = useState(false);
   const [formError, setFormError] = useState<string | null>(null);
   const [actionError, setActionError] = useState<string | null>(null);
-  const [deletingId, setDeletingId] = useState<string | null>(null);
-
-  const [editingId, setEditingId] = useState<string | null>(null);
-  const [editScheduledAt, setEditScheduledAt] = useState("");
-  const [editReason, setEditReason] = useState<AppointmentReason | "">("");
-  const [savingEdit, setSavingEdit] = useState(false);
-
-  const [notesEditingId, setNotesEditingId] = useState<string | null>(null);
-  const [notesDraft, setNotesDraft] = useState("");
-  const [savingNotes, setSavingNotes] = useState(false);
 
   const [viewMode, setViewMode] = useState<"list" | "day">("list");
   const [dayDate, setDayDate] = useState(() => toDateInputValue(new Date()));
@@ -89,6 +76,27 @@ export function AppointmentsPage() {
     setDayDate(toDateInputValue(next));
   }
 
+  const petSuggestions = useMemo(() => {
+    const q = petQuery.trim().toLowerCase();
+    const pets = petDirectory.pets;
+    if (!q) return pets.slice(0, 8);
+    return pets
+      .filter((pet) => [pet.name, pet.ownerName].some((field) => field.toLowerCase().includes(q)))
+      .slice(0, 8);
+  }, [petDirectory.pets, petQuery]);
+
+  function selectPet(pet: { id: string; name: string; species: string; ownerName: string }) {
+    setPetId(pet.id);
+    setPetQuery(`${pet.name} (${pet.species}) — ${pet.ownerName}`);
+    setPetDropdownOpen(false);
+  }
+
+  function handlePetInputChange(value: string) {
+    setPetQuery(value);
+    setPetId("");
+    setPetDropdownOpen(true);
+  }
+
   async function handleSubmit(event: FormEvent) {
     event.preventDefault();
     setSubmitting(true);
@@ -100,6 +108,7 @@ export function AppointmentsPage() {
         reason: reason || undefined,
       });
       setPetId("");
+      setPetQuery("");
       setScheduledAt("");
       setReason("");
       refresh();
@@ -120,188 +129,36 @@ export function AppointmentsPage() {
     }
   }
 
-  async function handleDelete(appointmentId: string) {
-    if (!window.confirm("Delete this appointment? This cannot be undone.")) {
-      return;
-    }
-    setDeletingId(appointmentId);
-    setActionError(null);
-    try {
-      await deleteAppointment(token, appointmentId);
-      refresh();
-    } catch (err) {
-      setActionError(err instanceof Error ? err.message : "Failed to delete appointment");
-    } finally {
-      setDeletingId(null);
-    }
-  }
-
-  function startEdit(appointmentId: string, scheduledAtValue: string, reasonValue: AppointmentReason | null) {
-    setActionError(null);
-    setEditingId(appointmentId);
-    setEditScheduledAt(scheduledAtValue.slice(0, 16));
-    setEditReason(reasonValue ?? "");
-  }
-
-  function cancelEdit() {
-    setEditingId(null);
-  }
-
-  async function saveEdit(appointmentId: string) {
-    setSavingEdit(true);
-    setActionError(null);
-    try {
-      await updateAppointment(token, appointmentId, {
-        scheduled_at: editScheduledAt,
-        reason: editReason || undefined,
-      });
-      cancelEdit();
-      refresh();
-    } catch (err) {
-      setActionError(err instanceof Error ? err.message : "Failed to update appointment");
-    } finally {
-      setSavingEdit(false);
-    }
-  }
-
-  function startNotesEdit(appointmentId: string, currentNotes: string | null) {
-    setActionError(null);
-    setNotesEditingId(appointmentId);
-    setNotesDraft(currentNotes ?? "");
-  }
-
-  function cancelNotesEdit() {
-    setNotesEditingId(null);
-  }
-
-  async function saveNotes(appointmentId: string) {
-    setSavingNotes(true);
-    setActionError(null);
-    try {
-      await updateAppointmentNotes(token, appointmentId, notesDraft);
-      cancelNotesEdit();
-      refresh();
-    } catch (err) {
-      setActionError(err instanceof Error ? err.message : "Failed to update visit notes");
-    } finally {
-      setSavingNotes(false);
-    }
-  }
-
   function renderRow(appointment: DirectoryAppointment) {
     return (
-      <Fragment key={appointment.id}>
-        {editingId === appointment.id ? (
-          <tr>
-            <td>{appointment.petName}</td>
-            <td>{appointment.ownerName}</td>
-            <td>
-              <input
-                type="datetime-local"
-                value={editScheduledAt}
-                onChange={(e) => setEditScheduledAt(e.target.value)}
-              />
-            </td>
-            <td>
-              <span className={`status-pill ${statusPillClass(appointment.status)}`}>{STATUS_LABELS[appointment.status]}</span>
-            </td>
-            <td>
-              <select value={editReason} onChange={(e) => setEditReason(e.target.value as AppointmentReason | "")}>
-                <option value="">No reason</option>
-                {Object.entries(APPOINTMENT_REASON_LABELS).map(([value, label]) => (
-                  <option key={value} value={value}>
-                    {label}
-                  </option>
-                ))}
-              </select>
-            </td>
-            <td>
-              <div className="actions">
-                <button type="button" disabled={savingEdit} onClick={() => saveEdit(appointment.id)}>
-                  {savingEdit ? "Saving..." : "Save"}
-                </button>
-                <button type="button" className="secondary" onClick={cancelEdit}>
-                  Cancel
-                </button>
-              </div>
-            </td>
-          </tr>
-        ) : (
-          <tr>
-            <td>{appointment.petName}</td>
-            <td>{appointment.ownerName}</td>
-            <td>{formatDateTime(appointment.scheduled_at)}</td>
-            <td>
-              <span className={`status-pill ${statusPillClass(appointment.status)}`}>{STATUS_LABELS[appointment.status]}</span>
-            </td>
-            <td>{appointment.reason ? APPOINTMENT_REASON_LABELS[appointment.reason] : "—"}</td>
-            <td>
-              <div className="actions">
-                {ALLOWED_TRANSITIONS[appointment.status].map((next) => (
-                  <button
-                    key={next}
-                    type="button"
-                    className="secondary"
-                    onClick={() => handleTransition(appointment.id, next)}
-                  >
-                    {STATUS_LABELS[next]}
-                  </button>
-                ))}
-                <Link to={`/check-queue/${appointment.id}`} target="_blank" rel="noreferrer" className="secondary">
-                  Queue link
-                </Link>
-                {!TERMINAL_STATUSES.includes(appointment.status) && (
-                  <button
-                    type="button"
-                    className="secondary"
-                    onClick={() => startEdit(appointment.id, appointment.scheduled_at, appointment.reason)}
-                  >
-                    Edit
-                  </button>
-                )}
-                <button
-                  type="button"
-                  className="secondary"
-                  onClick={() => startNotesEdit(appointment.id, appointment.visit_notes)}
-                >
-                  Visit notes
-                </button>
-                <button
-                  type="button"
-                  className="secondary"
-                  disabled={deletingId === appointment.id}
-                  onClick={() => handleDelete(appointment.id)}
-                >
-                  {deletingId === appointment.id ? "Deleting..." : "Delete"}
-                </button>
-              </div>
-            </td>
-          </tr>
-        )}
-        {notesEditingId === appointment.id && (
-          <tr>
-            <td colSpan={6}>
-              <div className="field">
-                <label htmlFor={`visit_notes_${appointment.id}`}>Visit notes for {appointment.petName}</label>
-                <textarea
-                  id={`visit_notes_${appointment.id}`}
-                  rows={3}
-                  value={notesDraft}
-                  onChange={(e) => setNotesDraft(e.target.value)}
-                />
-              </div>
-              <div className="actions">
-                <button type="button" disabled={savingNotes} onClick={() => saveNotes(appointment.id)}>
-                  {savingNotes ? "Saving..." : "Save notes"}
-                </button>
-                <button type="button" className="secondary" onClick={cancelNotesEdit}>
-                  Cancel
-                </button>
-              </div>
-            </td>
-          </tr>
-        )}
-      </Fragment>
+      <tr key={appointment.id}>
+        <td>{appointment.petName}</td>
+        <td>{appointment.ownerName}</td>
+        <td>{formatDateTime(appointment.scheduled_at)}</td>
+        <td>
+          <span className={`status-pill ${statusPillClass(appointment.status)}`}>
+            {STATUS_LABELS[appointment.status]}
+          </span>
+        </td>
+        <td>{appointment.reason ? APPOINTMENT_REASON_LABELS[appointment.reason] : "—"}</td>
+        <td>
+          <div className="actions">
+            {ALLOWED_TRANSITIONS[appointment.status].map((next) => (
+              <button
+                key={next}
+                type="button"
+                className="secondary"
+                onClick={() => handleTransition(appointment.id, next)}
+              >
+                {STATUS_LABELS[next]}
+              </button>
+            ))}
+            <Link to={`/appointments/${appointment.id}`} className="secondary">
+              View
+            </Link>
+          </div>
+        </td>
+      </tr>
     );
   }
 
@@ -311,18 +168,33 @@ export function AppointmentsPage() {
 
       <form className="card" onSubmit={handleSubmit}>
         <div className="form-grid">
-          <div className="field">
+          <div className="field" style={{ position: "relative" }}>
             <label htmlFor="pet">Pet</label>
-            <select id="pet" value={petId} onChange={(e) => setPetId(e.target.value)} required>
-              <option value="" disabled>
-                Select a pet
-              </option>
-              {petDirectory.pets.map((pet) => (
-                <option key={pet.id} value={pet.id}>
-                  {pet.name} ({pet.species}) — {pet.ownerName}
-                </option>
-              ))}
-            </select>
+            <input
+              id="pet"
+              value={petQuery}
+              onChange={(e) => handlePetInputChange(e.target.value)}
+              onFocus={() => setPetDropdownOpen(true)}
+              onBlur={() => setTimeout(() => setPetDropdownOpen(false), 150)}
+              placeholder="Search by pet or owner name..."
+              autoComplete="off"
+              required
+            />
+            {petDropdownOpen && petSuggestions.length > 0 && (
+              <div className="combobox-menu">
+                {petSuggestions.map((pet) => (
+                  <button
+                    type="button"
+                    key={pet.id}
+                    className="combobox-option"
+                    onMouseDown={(e) => e.preventDefault()}
+                    onClick={() => selectPet(pet)}
+                  >
+                    {pet.name} ({pet.species}) — {pet.ownerName}
+                  </button>
+                ))}
+              </div>
+            )}
           </div>
           <div className="field">
             <label htmlFor="scheduled_at">Date &amp; time</label>
@@ -349,7 +221,7 @@ export function AppointmentsPage() {
               ))}
             </select>
           </div>
-          <button type="submit" disabled={submitting || petDirectory.pets.length === 0}>
+          <button type="submit" disabled={submitting || !petId || petDirectory.pets.length === 0}>
             {submitting ? "Scheduling..." : "Schedule appointment"}
           </button>
         </div>

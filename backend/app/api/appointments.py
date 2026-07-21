@@ -204,6 +204,7 @@ def update_appointment_notes(
     """Visit notes are clinical documentation, not scheduling metadata - editable regardless of status."""
     appointment = _get_appointment_or_404(db, appointment_id)
     appointment.visit_notes = body.visit_notes
+    appointment.prescription = body.prescription
     db.flush()
     return appointment
 

@@ -154,11 +154,6 @@ nav.app-nav {
   letter-spacing: -0.2px;
 }
 
-.brand-mark {
-  font-size: 20px;
-  line-height: 1;
-}
-
 nav.app-nav a:not(.brand) {
   color: var(--text);
   text-decoration: none;
@@ -199,6 +194,10 @@ main.page {
   padding: 20px;
   margin-bottom: 24px;
   box-shadow: var(--shadow);
+}
+
+.card h3:first-child {
+  margin-top: 0;
 }
 
 .form-grid {
@@ -246,6 +245,57 @@ textarea:focus {
 textarea {
   font-family: var(--sans);
   resize: vertical;
+}
+
+.combobox-menu {
+  position: absolute;
+  top: calc(100% + 4px);
+  left: 0;
+  right: 0;
+  z-index: 20;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  box-shadow: var(--shadow-lg);
+  max-height: 220px;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  padding: 4px;
+}
+
+.combobox-option {
+  all: unset;
+  box-sizing: border-box;
+  width: 100%;
+  padding: 8px 10px;
+  border-radius: 6px;
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--text-h);
+  cursor: pointer;
+}
+
+.combobox-option:hover {
+  background: var(--accent-bg);
+}
+
+.combobox-empty {
+  padding: 8px 10px;
+  font-size: 14px;
+  color: var(--text);
+}
+
+.global-search {
+  position: relative;
+  width: 220px;
+  margin-right: 12px;
+}
+
+.global-search input {
+  width: 100%;
+  padding: 7px 10px;
+  font-size: 14px;
 }
 
 button {
@@ -304,6 +354,27 @@ a.secondary:hover {
   background: var(--code-bg);
   border-color: var(--border);
   color: var(--text-h);
+  text-decoration: none;
+}
+
+.chip {
+  font-size: 13px;
+  font-weight: 500;
+  padding: 6px 12px;
+  border-radius: 999px;
+  border: 1px solid var(--accent-border);
+  background: var(--accent-bg);
+  color: var(--text-h);
+}
+
+.chip:hover:not(:disabled) {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: #ffffff;
+}
+
+.invoice-next-step {
+  border-left: 3px solid var(--accent);
 }
 
 table {
@@ -315,6 +386,14 @@ table {
   border-radius: 12px;
   overflow: hidden;
   box-shadow: var(--shadow);
+  margin-bottom: 24px;
+}
+
+.card table {
+  border: none;
+  box-shadow: none;
+  border-radius: 0;
+  margin-bottom: 0;
 }
 
 th,

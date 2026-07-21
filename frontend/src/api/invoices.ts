@@ -42,6 +42,12 @@ export interface Invoice {
   notes: string | null;
   paid_at: string | null;
   payment_method: PaymentMethod | null;
+  total_cents: number;
+}
+
+export interface CommonLineItem {
+  description: string;
+  unit_price_cents: number;
 }
 
 export interface InvoiceWithLineItems extends Invoice {
@@ -60,12 +66,21 @@ export function listInvoices(token: string): Promise<Invoice[]> {
   return apiFetch("/api/invoices", { token });
 }
 
+export function getCommonLineItems(token: string): Promise<CommonLineItem[]> {
+  return apiFetch("/api/invoices/common-line-items", { token });
+}
+
 export function createInvoice(token: string, body: InvoiceCreateInput): Promise<Invoice> {
   return apiFetch("/api/invoices", { method: "POST", token, body });
 }
 
 export function getInvoice(token: string, invoiceId: string): Promise<InvoiceWithLineItems> {
   return apiFetch(`/api/invoices/${invoiceId}`, { token });
+}
+
+/** Backfills line items from the linked appointment's vet notes; no-op if the invoice already has any. */
+export function autoDraftLineItems(token: string, invoiceId: string): Promise<InvoiceWithLineItems> {
+  return apiFetch(`/api/invoices/${invoiceId}/auto-draft-line-items`, { method: "POST", token });
 }
 
 export function addLineItem(token: string, invoiceId: string, body: LineItemCreateInput): Promise<LineItem> {

@@ -6,3 +6,8 @@ psycopg[binary]
 pydantic-settings
 bcrypt
 pyjwt
+langchain-core
+langchain-google-genai
+langchain-text-splitters
+pgvector
+sentence-transformers

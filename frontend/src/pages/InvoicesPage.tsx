@@ -1,10 +1,10 @@
-import { useEffect, useState, type FormEvent } from "react";
-import { Link } from "react-router-dom";
+import { useEffect, useMemo, useState, type FormEvent } from "react";
+import { Link, useSearchParams } from "react-router-dom";
 import { useToken } from "../auth/AuthContext";
 import { createInvoice, deleteInvoice, listInvoices, type Invoice, type InvoiceStatus } from "../api/invoices";
 import { listOwners, type Owner } from "../api/owners";
 import { useAppointmentDirectory } from "../hooks/useAppointmentDirectory";
-import { statusPillClass } from "../lib/format";
+import { formatMoney, statusPillClass } from "../lib/format";
 
 const STATUS_LABELS: Record<InvoiceStatus, string> = {
   draft: "Draft",
@@ -16,6 +16,7 @@ const STATUS_LABELS: Record<InvoiceStatus, string> = {
 export function InvoicesPage() {
   const token = useToken();
   const { appointments } = useAppointmentDirectory(token);
+  const [searchParams, setSearchParams] = useSearchParams();
 
   const [invoices, setInvoices] = useState<Invoice[]>([]);
   const [owners, setOwners] = useState<Owner[]>([]);
@@ -23,6 +24,8 @@ export function InvoicesPage() {
   const [loadError, setLoadError] = useState<string | null>(null);
 
   const [ownerId, setOwnerId] = useState("");
+  const [ownerQuery, setOwnerQuery] = useState("");
+  const [ownerDropdownOpen, setOwnerDropdownOpen] = useState(false);
   const [appointmentId, setAppointmentId] = useState("");
   const [dueDate, setDueDate] = useState("");
   const [notes, setNotes] = useState("");
@@ -51,6 +54,44 @@ export function InvoicesPage() {
   const ownersById = new Map(owners.map((owner) => [owner.id, `${owner.first_name} ${owner.last_name}`]));
   const appointmentsForOwner = appointments.filter((appointment) => appointment.ownerId === ownerId);
 
+  // Prefill from a "Bill this appointment" link (?ownerId=...&appointmentId=...) once owners have loaded.
+  useEffect(() => {
+    if (owners.length === 0) return;
+    const prefillOwnerId = searchParams.get("ownerId");
+    const prefillAppointmentId = searchParams.get("appointmentId");
+    if (!prefillOwnerId) return;
+    const owner = owners.find((o) => o.id === prefillOwnerId);
+    if (!owner) return;
+
+    setOwnerId(owner.id);
+    setOwnerQuery(`${owner.first_name} ${owner.last_name}`);
+    if (prefillAppointmentId) setAppointmentId(prefillAppointmentId);
+    setSearchParams({}, { replace: true });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [owners]);
+
+  const ownerSuggestions = useMemo(() => {
+    const q = ownerQuery.trim().toLowerCase();
+    if (!q) return owners.slice(0, 8);
+    return owners
+      .filter((owner) => `${owner.first_name} ${owner.last_name}`.toLowerCase().includes(q))
+      .slice(0, 8);
+  }, [owners, ownerQuery]);
+
+  function selectOwner(owner: Owner) {
+    setOwnerId(owner.id);
+    setOwnerQuery(`${owner.first_name} ${owner.last_name}`);
+    setAppointmentId("");
+    setOwnerDropdownOpen(false);
+  }
+
+  function handleOwnerInputChange(value: string) {
+    setOwnerQuery(value);
+    setOwnerId("");
+    setAppointmentId("");
+    setOwnerDropdownOpen(true);
+  }
+
   const query = search.trim().toLowerCase();
   const visibleInvoices = invoices.filter((invoice) => {
     if (statusFilter !== "all" && invoice.status !== statusFilter) return false;
@@ -71,6 +112,7 @@ export function InvoicesPage() {
         notes: notes || undefined,
       });
       setOwnerId("");
+      setOwnerQuery("");
       setAppointmentId("");
       setDueDate("");
       setNotes("");
@@ -83,7 +125,11 @@ export function InvoicesPage() {
   }
 
   async function handleDelete(invoice: Invoice) {
-    if (!window.confirm("Delete this draft invoice? This cannot be undone.")) {
+    const warning =
+      invoice.status === "paid"
+        ? "This invoice has been paid. Deleting it will permanently erase this payment record. This cannot be undone."
+        : "Delete this invoice? This cannot be undone.";
+    if (!window.confirm(warning)) {
       return;
     }
     setDeletingId(invoice.id);
@@ -104,26 +150,33 @@ export function InvoicesPage() {
 
       <form className="card" onSubmit={handleSubmit}>
         <div className="form-grid">
-          <div className="field">
+          <div className="field" style={{ position: "relative" }}>
             <label htmlFor="owner">Owner</label>
-            <select
+            <input
               id="owner"
-              value={ownerId}
-              onChange={(e) => {
-                setOwnerId(e.target.value);
-                setAppointmentId("");
-              }}
+              value={ownerQuery}
+              onChange={(e) => handleOwnerInputChange(e.target.value)}
+              onFocus={() => setOwnerDropdownOpen(true)}
+              onBlur={() => setTimeout(() => setOwnerDropdownOpen(false), 150)}
+              placeholder="Search by name..."
+              autoComplete="off"
               required
-            >
-              <option value="" disabled>
-                Select an owner
-              </option>
-              {owners.map((owner) => (
-                <option key={owner.id} value={owner.id}>
-                  {owner.first_name} {owner.last_name}
-                </option>
-              ))}
-            </select>
+            />
+            {ownerDropdownOpen && ownerSuggestions.length > 0 && (
+              <div className="combobox-menu">
+                {ownerSuggestions.map((owner) => (
+                  <button
+                    type="button"
+                    key={owner.id}
+                    className="combobox-option"
+                    onMouseDown={(e) => e.preventDefault()}
+                    onClick={() => selectOwner(owner)}
+                  >
+                    {owner.first_name} {owner.last_name}
+                  </button>
+                ))}
+              </div>
+            )}
           </div>
           <div className="field">
             <label htmlFor="appointment">Appointment (optional)</label>
@@ -149,7 +202,7 @@ export function InvoicesPage() {
             <label htmlFor="notes">Notes</label>
             <input id="notes" value={notes} onChange={(e) => setNotes(e.target.value)} />
           </div>
-          <button type="submit" disabled={submitting || owners.length === 0}>
+          <button type="submit" disabled={submitting || !ownerId || owners.length === 0}>
             {submitting ? "Creating..." : "Create invoice"}
           </button>
         </div>
@@ -193,6 +246,7 @@ export function InvoicesPage() {
             <tr>
               <th>Owner</th>
               <th>Status</th>
+              <th>Total</th>
               <th>Due date</th>
               <th>Notes</th>
               <th></th>
@@ -207,6 +261,7 @@ export function InvoicesPage() {
                     {STATUS_LABELS[invoice.status]}
                   </span>
                 </td>
+                <td>{formatMoney(invoice.total_cents)}</td>
                 <td>{invoice.due_date ?? "—"}</td>
                 <td>{invoice.notes ?? "—"}</td>
                 <td>
@@ -214,23 +269,21 @@ export function InvoicesPage() {
                     <Link to={`/invoices/${invoice.id}`} className="secondary">
                       View
                     </Link>
-                    {invoice.status === "draft" && (
-                      <button
-                        type="button"
-                        className="secondary"
-                        disabled={deletingId === invoice.id}
-                        onClick={() => handleDelete(invoice)}
-                      >
-                        {deletingId === invoice.id ? "Deleting..." : "Delete"}
-                      </button>
-                    )}
+                    <button
+                      type="button"
+                      className="secondary"
+                      disabled={deletingId === invoice.id}
+                      onClick={() => handleDelete(invoice)}
+                    >
+                      {deletingId === invoice.id ? "Deleting..." : "Delete"}
+                    </button>
                   </div>
                 </td>
               </tr>
             ))}
             {visibleInvoices.length === 0 && (
               <tr>
-                <td colSpan={5} className="muted">
+                <td colSpan={6} className="muted">
                   {invoices.length === 0 ? "No invoices yet." : "No invoices match your filters."}
                 </td>
               </tr>

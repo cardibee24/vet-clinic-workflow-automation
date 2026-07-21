@@ -2,6 +2,7 @@ import { useEffect, useState, type FormEvent } from "react";
 import { Link } from "react-router-dom";
 import { useToken } from "../auth/AuthContext";
 import { createOwner, deleteOwner, updateOwner, listOwners, type Owner } from "../api/owners";
+import { usePetDirectory } from "../hooks/usePetDirectory";
 
 interface EditState {
   firstName: string;
@@ -12,6 +13,7 @@ interface EditState {
 
 export function OwnersPage() {
   const token = useToken();
+  const petDirectory = usePetDirectory(token);
 
   const [owners, setOwners] = useState<Owner[]>([]);
   const [loading, setLoading] = useState(true);
@@ -29,6 +31,13 @@ export function OwnersPage() {
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editState, setEditState] = useState<EditState | null>(null);
   const [savingEdit, setSavingEdit] = useState(false);
+
+  const petsByOwnerId = new Map<string, typeof petDirectory.pets>();
+  for (const pet of petDirectory.pets) {
+    const existing = petsByOwnerId.get(pet.ownerId);
+    if (existing) existing.push(pet);
+    else petsByOwnerId.set(pet.ownerId, [pet]);
+  }
 
   const [search, setSearch] = useState("");
   const query = search.trim().toLowerCase();
@@ -175,6 +184,7 @@ export function OwnersPage() {
             <thead>
               <tr>
                 <th>Name</th>
+                <th>Pets</th>
                 <th>Email</th>
                 <th>Phone</th>
                 <th></th>
@@ -197,6 +207,9 @@ export function OwnersPage() {
                           placeholder="Last name"
                         />
                       </div>
+                    </td>
+                    <td className="muted">
+                      {(petsByOwnerId.get(owner.id) ?? []).map((pet) => pet.name).join(", ") || "—"}
                     </td>
                     <td>
                       <input
@@ -226,14 +239,19 @@ export function OwnersPage() {
                 ) : (
                   <tr key={owner.id}>
                     <td>
-                      {owner.first_name} {owner.last_name}
+                      <Link to={`/owners/${owner.id}`}>
+                        {owner.first_name} {owner.last_name}
+                      </Link>
+                    </td>
+                    <td className="muted">
+                      {(petsByOwnerId.get(owner.id) ?? []).map((pet) => pet.name).join(", ") || "—"}
                     </td>
                     <td>{owner.email ?? "—"}</td>
                     <td>{owner.phone ?? "—"}</td>
                     <td>
                       <div className="actions">
-                        <Link to={`/owners/${owner.id}`} className="secondary">
-                          View
+                        <Link to={`/owners/${owner.id}?addPet=1`} className="secondary">
+                          Add pet
                         </Link>
                         <button type="button" className="secondary" onClick={() => startEdit(owner)}>
                           Edit
@@ -253,7 +271,7 @@ export function OwnersPage() {
               )}
               {visibleOwners.length === 0 && (
                 <tr>
-                  <td colSpan={4} className="muted">
+                  <td colSpan={5} className="muted">
                     {owners.length === 0 ? "No owners yet." : "No owners match your search."}
                   </td>
                 </tr>

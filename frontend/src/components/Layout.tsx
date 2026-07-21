@@ -1,5 +1,6 @@
 import { NavLink, Outlet } from "react-router-dom";
 import { useAuth } from "../auth/AuthContext";
+import { GlobalSearch } from "./GlobalSearch";
 
 export function Layout() {
   const { state, logout } = useAuth();
@@ -9,7 +10,7 @@ export function Layout() {
     <>
       <nav className="app-nav">
         <NavLink to="/dashboard" className="brand">
-          <span className="brand-mark">🐾</span> VetFlow
+          VetFlow
         </NavLink>
         <NavLink to="/dashboard" className={({ isActive }) => (isActive ? "active" : undefined)}>
           Dashboard
@@ -27,6 +28,7 @@ export function Layout() {
           Queue
         </NavLink>
         <span className="spacer" />
+        <GlobalSearch />
         {user && <span className="muted">{user.full_name}</span>}
         <button type="button" className="secondary" onClick={logout}>
           Log out

@@ -63,6 +63,19 @@ class InvoiceWithLineItems(InvoiceOut):
         return sum(item.amount_cents for item in self.line_items)
 
 
+class InvoiceListOut(InvoiceOut):
+    total_cents: int
+
+
 class InvoiceStatusUpdate(BaseModel):
     status: InvoiceStatus
     payment_method: PaymentMethod | None = None
+
+
+class CommonLineItem(BaseModel):
+    description: str
+    unit_price_cents: int
+
+
+class DraftLineItemsRequest(BaseModel):
+    notes: str

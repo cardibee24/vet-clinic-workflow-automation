@@ -36,7 +36,7 @@ export function LoginPage() {
     <div className="auth-shell">
       <div className="auth-card">
         <div className="brand">
-          <span className="brand-mark">🐾</span> VetFlow
+          VetFlow
         </div>
         <h2>Staff sign in</h2>
         <form onSubmit={handleSubmit}>

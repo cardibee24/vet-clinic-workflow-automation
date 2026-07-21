@@ -47,7 +47,7 @@ export function CheckQueuePage() {
   return (
     <main className="page" style={{ maxWidth: 480, margin: "0 auto" }}>
       <div className="brand" style={{ justifyContent: "center", marginBottom: 8 }}>
-        <span className="brand-mark">🐾</span> VetFlow
+        VetFlow
       </div>
       <h2 style={{ textAlign: "center" }}>Check your queue number</h2>
       <form onSubmit={handleSubmit}>

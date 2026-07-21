@@ -41,6 +41,9 @@ class Invoice(Base, UUIDPKMixin, TimestampMixin):
     issued_at: Mapped[datetime | None] = mapped_column(nullable=True)
     due_date: Mapped[date | None] = mapped_column(nullable=True)
     notes: Mapped[str | None] = mapped_column(nullable=True)
+    # Appointment vet-notes text last used to auto-draft line items - lets us detect
+    # when the vet has since added/edited notes and re-sync instead of re-drafting forever.
+    synced_vet_notes: Mapped[str | None] = mapped_column(nullable=True)
     paid_at: Mapped[datetime | None] = mapped_column(nullable=True)
     payment_method: Mapped[PaymentMethod | None] = mapped_column(
         Enum(
