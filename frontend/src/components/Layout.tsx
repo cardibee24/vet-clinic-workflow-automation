@@ -27,6 +27,9 @@ export function Layout() {
         <NavLink to="/queue" className={({ isActive }) => (isActive ? "active" : undefined)}>
           Queue
         </NavLink>
+        <NavLink to="/knowledge" className={({ isActive }) => (isActive ? "active" : undefined)}>
+          Policy Q&amp;A
+        </NavLink>
         <span className="spacer" />
         <GlobalSearch />
         {user && <span className="muted">{user.full_name}</span>}
