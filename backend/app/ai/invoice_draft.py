@@ -1,15 +1,15 @@
 """Draft invoice line items from a vet's free-text visit notes.
 
 This is a small LangChain "chain": a prompt template feeds the notes and the
-clinic's price list to Gemini, and `.with_structured_output(...)` asks it
-to answer in the exact shape of `LineItemCreate` instead of a paragraph.
+clinic's price list to Llama 3.1 8B (via Groq), and `.with_structured_output(...)`
+asks it to answer in the exact shape of `LineItemCreate` instead of a paragraph.
 
 Nothing here is saved to the database — callers get back proposed line items
 for a human to review before adding them to a real invoice.
 """
 
 from langchain_core.prompts import ChatPromptTemplate
-from langchain_google_genai import ChatGoogleGenerativeAI
+from langchain_groq import ChatGroq
 from pydantic import BaseModel
 
 from app.config import get_settings
@@ -25,7 +25,10 @@ _PROMPT = ChatPromptTemplate.from_messages(
             "whenever a listed service matches; otherwise write a short description "
             "and leave unit_price_cents at your best estimate. Use quantity 1 unless "
             "the notes clearly call for more. Do not invent services the notes don't "
-            "mention.",
+            "mention.\n\n"
+            "Respond with ONLY a JSON object matching this schema, no other text:\n"
+            '{{"items": [{{"description": string, "quantity": integer, '
+            '"unit_price_cents": integer}}, ...]}}',
         ),
         (
             "human",
@@ -43,8 +46,11 @@ class _DraftedLineItems(BaseModel):
 def draft_line_items(notes: str, catalog: list[CommonLineItem]) -> list[LineItemCreate]:
     """Turn free-text visit notes into proposed invoice line items."""
     settings = get_settings()
-    llm = ChatGoogleGenerativeAI(model="gemini-2.5-flash", google_api_key=settings.GOOGLE_API_KEY)
-    structured_llm = llm.with_structured_output(_DraftedLineItems)
+    llm = ChatGroq(model="llama-3.1-8b-instant", api_key=settings.GROQ_API_KEY)
+    # json_mode, not the with_structured_output default (function_calling) - this
+    # model unreliably formats tool calls on Groq, but is solid at plain JSON when
+    # the schema is spelled out in the prompt (which json_mode requires anyway).
+    structured_llm = llm.with_structured_output(_DraftedLineItems, method="json_mode")
 
     catalog_text = "\n".join(f"- {item.description} - {item.unit_price_cents}" for item in catalog)
     if not catalog_text:

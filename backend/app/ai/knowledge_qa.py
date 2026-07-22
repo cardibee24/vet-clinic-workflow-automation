@@ -7,7 +7,7 @@ answer using only that context, citing which document(s) it used.
 """
 
 from langchain_core.prompts import ChatPromptTemplate
-from langchain_google_genai import ChatGoogleGenerativeAI
+from langchain_groq import ChatGroq
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
@@ -26,7 +26,9 @@ _PROMPT = ChatPromptTemplate.from_messages(
             "policy. Answer using ONLY the context passages below - do not use "
             "outside knowledge, and do not guess. If the context doesn't contain "
             "the answer, say you don't know. List which document(s) the answer "
-            "came from in `sources`, using their exact names as given.",
+            "came from in `sources`, using their exact names as given.\n\n"
+            "Respond with ONLY a JSON object matching this schema, no other text:\n"
+            '{{"answer": string, "sources": [string, ...]}}',
         ),
         (
             "human",
@@ -36,11 +38,21 @@ _PROMPT = ChatPromptTemplate.from_messages(
 )
 
 
-def retrieve_chunks(db: Session, question: str, top_k: int = _TOP_K) -> list[KnowledgeChunk]:
-    """Find the stored chunks whose embedding is closest in meaning to the question."""
+def retrieve_chunks(
+    db: Session, question: str, top_k: int = _TOP_K, document: str | None = None
+) -> list[KnowledgeChunk]:
+    """Find the stored chunks whose embedding is closest in meaning to the question.
+
+    Pass `document` to restrict the search to one ingested document (metadata
+    filtering) instead of searching across all of them - use this when the
+    caller already knows which document is relevant, so a mediocre embedding
+    ranking can't push the right chunk out of the top-k.
+    """
     question_embedding = embed_text(question)
-    stmt = select(KnowledgeChunk).order_by(KnowledgeChunk.embedding.cosine_distance(question_embedding)).limit(top_k)
-    return list(db.execute(stmt).scalars().all())
+    stmt = select(KnowledgeChunk).order_by(KnowledgeChunk.embedding.cosine_distance(question_embedding))
+    if document is not None:
+        stmt = stmt.where(KnowledgeChunk.document == document)
+    return list(db.execute(stmt.limit(top_k)).scalars().all())
 
 
 def answer_question(db: Session, question: str) -> AskResponse:
@@ -52,8 +64,8 @@ def answer_question(db: Session, question: str) -> AskResponse:
     context = "\n\n".join(f"[{chunk.document}] {chunk.content}" for chunk in chunks)
 
     settings = get_settings()
-    llm = ChatGoogleGenerativeAI(model="gemini-2.5-flash", google_api_key=settings.GOOGLE_API_KEY)
-    structured_llm = llm.with_structured_output(AskResponse)
+    llm = ChatGroq(model="llama-3.1-8b-instant", api_key=settings.GROQ_API_KEY)
+    structured_llm = llm.with_structured_output(AskResponse, method="json_mode")
 
     chain = _PROMPT | structured_llm
     return chain.invoke({"context": context, "question": question})

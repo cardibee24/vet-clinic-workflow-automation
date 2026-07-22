@@ -7,7 +7,8 @@ pydantic-settings
 bcrypt
 pyjwt
 langchain-core
-langchain-google-genai
+langchain-groq
 langchain-text-splitters
+langgraph
 pgvector
 sentence-transformers

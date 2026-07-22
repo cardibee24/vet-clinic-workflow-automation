@@ -19,6 +19,7 @@ class Settings(BaseSettings):
     ACCESS_TOKEN_EXPIRE_MINUTES: int = 60 * 24
 
     GOOGLE_API_KEY: str | None = None
+    GROQ_API_KEY: str | None = None
 
 
 @lru_cache

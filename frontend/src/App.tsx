@@ -13,7 +13,7 @@ import { InvoicesPage } from "./pages/InvoicesPage";
 import { InvoiceDetailPage } from "./pages/InvoiceDetailPage";
 import { InvoicePrintPage } from "./pages/InvoicePrintPage";
 import { QueuePage } from "./pages/QueuePage";
-import { KnowledgePage } from "./pages/KnowledgePage";
+import { AssistantPage } from "./pages/AssistantPage";
 import { CheckQueuePage } from "./pages/CheckQueuePage";
 import { SelfCheckInPage } from "./pages/SelfCheckInPage";
 
@@ -39,7 +39,7 @@ function App() {
               <Route path="invoices" element={<InvoicesPage />} />
               <Route path="invoices/:invoiceId" element={<InvoiceDetailPage />} />
               <Route path="queue" element={<QueuePage />} />
-              <Route path="knowledge" element={<KnowledgePage />} />
+              <Route path="assistant" element={<AssistantPage />} />
             </Route>
           </Route>
           <Route path="*" element={<Navigate to="/" replace />} />
