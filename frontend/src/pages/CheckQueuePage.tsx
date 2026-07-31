@@ -1,6 +1,11 @@
 import { useEffect, useState, type FormEvent } from "react";
 import { useParams } from "react-router-dom";
-import { getAppointmentQueueStatus, type AppointmentQueueStatus } from "../api/appointments";
+import {
+  formatTicketNumber,
+  getAppointmentQueueStatus,
+  getQueueStatusByTicket,
+  type AppointmentQueueStatus,
+} from "../api/appointments";
 import { statusPillClass } from "../lib/format";
 
 const STATUS_LABELS: Record<string, string> = {
@@ -14,34 +19,44 @@ const STATUS_LABELS: Record<string, string> = {
 
 export function CheckQueuePage() {
   const { appointmentId: paramId } = useParams<{ appointmentId?: string }>();
-  const [appointmentId, setAppointmentId] = useState(paramId ?? "");
+  const [ticketInput, setTicketInput] = useState("");
   const [result, setResult] = useState<AppointmentQueueStatus | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  async function check(id: string) {
-    if (!id) return;
+  // Automatic lookup right after self-check-in, which redirects here with the
+  // full appointment ID in the URL - no typing involved, so no ticket number needed.
+  useEffect(() => {
+    if (!paramId) return;
     setLoading(true);
     setError(null);
-    try {
-      const data = await getAppointmentQueueStatus(id);
-      setResult(data);
-    } catch (err) {
-      setResult(null);
-      setError(err instanceof Error ? err.message : "Could not find that appointment");
-    } finally {
-      setLoading(false);
-    }
-  }
-
-  useEffect(() => {
-    if (paramId) void check(paramId);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+    getAppointmentQueueStatus(paramId)
+      .then(setResult)
+      .catch((err: unknown) => {
+        setResult(null);
+        setError(err instanceof Error ? err.message : "Could not find that appointment");
+      })
+      .finally(() => setLoading(false));
   }, [paramId]);
 
   async function handleSubmit(event: FormEvent) {
     event.preventDefault();
-    await check(appointmentId);
+    const ticketNumber = Number(ticketInput);
+    if (!Number.isInteger(ticketNumber) || ticketNumber <= 0) {
+      setError("Enter a valid ticket number");
+      return;
+    }
+    setLoading(true);
+    setError(null);
+    try {
+      const data = await getQueueStatusByTicket(ticketNumber);
+      setResult(data);
+    } catch (err) {
+      setResult(null);
+      setError(err instanceof Error ? err.message : "Could not find that ticket number");
+    } finally {
+      setLoading(false);
+    }
   }
 
   return (
@@ -50,25 +65,33 @@ export function CheckQueuePage() {
         VetFlow
       </div>
       <h2 style={{ textAlign: "center" }}>Check your queue number</h2>
-      <form onSubmit={handleSubmit}>
-        <div className="field">
-          <label htmlFor="appointment_id">Appointment ID</label>
-          <input
-            id="appointment_id"
-            value={appointmentId}
-            onChange={(e) => setAppointmentId(e.target.value)}
-            placeholder="Paste the ID from your confirmation"
-            required
-          />
-        </div>
-        <button type="submit" disabled={loading} style={{ marginTop: 12 }}>
-          {loading ? "Checking..." : "Check queue"}
-        </button>
-      </form>
+      {!paramId && (
+        <form onSubmit={handleSubmit}>
+          <div className="field">
+            <label htmlFor="ticket_number">Ticket number</label>
+            <input
+              id="ticket_number"
+              value={ticketInput}
+              onChange={(e) => setTicketInput(e.target.value)}
+              placeholder="e.g. 42"
+              inputMode="numeric"
+              required
+            />
+          </div>
+          <button type="submit" disabled={loading} style={{ marginTop: 12 }}>
+            {loading ? "Checking..." : "Check queue"}
+          </button>
+        </form>
+      )}
 
       {error && <p className="error-text">{error}</p>}
       {result && (
         <div className="card" style={{ marginTop: 24 }}>
+          {result.ticket_number !== null && (
+            <p className="muted" style={{ marginTop: 0 }}>
+              Ticket {formatTicketNumber(result.ticket_number)}
+            </p>
+          )}
           <p>
             Status:{" "}
             <span className={`status-pill ${statusPillClass(result.status)}`}>

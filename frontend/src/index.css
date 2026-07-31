@@ -142,7 +142,8 @@ nav.app-nav {
   z-index: 10;
 }
 
-.brand {
+.brand,
+.brand:hover {
   display: flex;
   align-items: center;
   gap: 8px;
@@ -169,7 +170,7 @@ nav.app-nav a:not(.brand):hover {
   background: var(--code-bg);
 }
 
-nav.app-nav a.active {
+nav.app-nav a.active:not(.brand) {
   color: var(--accent);
   background: var(--accent-bg);
 }

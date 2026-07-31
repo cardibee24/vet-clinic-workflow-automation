@@ -28,6 +28,7 @@ export function DashboardPage() {
   const token = useToken();
   const { appointments, loading: appointmentsLoading, error: appointmentsError } = useAppointmentDirectory(token);
 
+  const [qrExpanded, setQrExpanded] = useState(false);
   const [queue, setQueue] = useState<QueueSummary | null>(null);
   const [invoices, setInvoices] = useState<Invoice[]>([]);
   const [owners, setOwners] = useState<Owner[]>([]);
@@ -115,8 +116,24 @@ export function DashboardPage() {
             </Link>
           </div>
 
-          <div className="card" style={{ display: "flex", gap: 20, alignItems: "center", maxWidth: 420 }}>
-            <QRCodeSVG value={SELF_CHECK_IN_URL} size={96} />
+          <div
+            className="card"
+            style={{
+              display: "flex",
+              flexDirection: qrExpanded ? "column" : "row",
+              gap: 20,
+              alignItems: qrExpanded ? "flex-start" : "center",
+              maxWidth: qrExpanded ? 360 : 420,
+            }}
+          >
+            <button
+              type="button"
+              onClick={() => setQrExpanded((prev) => !prev)}
+              aria-label={qrExpanded ? "Shrink QR code" : "Expand QR code"}
+              style={{ background: "none", border: "none", padding: 0, lineHeight: 0, cursor: "pointer" }}
+            >
+              <QRCodeSVG value={SELF_CHECK_IN_URL} size={qrExpanded ? 320 : 96} />
+            </button>
             <div>
               <p style={{ margin: 0, fontWeight: 600, color: "var(--text-h)" }}>Walk-in self check-in</p>
               <p className="muted" style={{ marginTop: 4 }}>

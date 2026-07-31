@@ -21,6 +21,7 @@ class AppointmentOut(BaseModel):
     status: AppointmentStatus
     reason: AppointmentReason | None
     checked_in_at: datetime | None
+    ticket_number: int | None
     visit_notes: str | None
     prescription: str | None
 
@@ -52,6 +53,7 @@ class QueueEntry(BaseModel):
     appointment_id: uuid.UUID
     pet_id: uuid.UUID
     checked_in_at: datetime | None
+    ticket_number: int | None
     reason: AppointmentReason | None
 
 
@@ -63,5 +65,6 @@ class QueueSummary(BaseModel):
 class AppointmentQueueStatus(BaseModel):
     appointment_id: uuid.UUID
     status: AppointmentStatus
+    ticket_number: int | None
     position: int | None
     total_waiting: int

@@ -85,7 +85,7 @@ def test_create_invoice_with_appointment_auto_drafts_line_items(client, auth_hea
             LineItemCreate(description="Antifungal cream", quantity=1, unit_price_cents=1500),
         ]
 
-    monkeypatch.setattr("app.api.invoices.draft_line_items", fake_draft_line_items)
+    monkeypatch.setattr("app.services.invoice_drafting.draft_line_items", fake_draft_line_items)
 
     create = client.post(
         "/api/invoices",
@@ -122,7 +122,7 @@ def test_create_invoice_auto_draft_failure_does_not_block_creation(
     def fake_draft_line_items(notes, catalog):
         raise RuntimeError("no API key configured")
 
-    monkeypatch.setattr("app.api.invoices.draft_line_items", fake_draft_line_items)
+    monkeypatch.setattr("app.services.invoice_drafting.draft_line_items", fake_draft_line_items)
 
     create = client.post(
         "/api/invoices",
@@ -152,7 +152,7 @@ def test_retry_auto_draft_backfills_line_items(client, auth_headers, db_session,
     def fake_draft_line_items(notes, catalog):
         return [LineItemCreate(description="Antifungal cream", quantity=1, unit_price_cents=1500)]
 
-    monkeypatch.setattr("app.api.invoices.draft_line_items", fake_draft_line_items)
+    monkeypatch.setattr("app.services.invoice_drafting.draft_line_items", fake_draft_line_items)
 
     response = client.post(f"/api/invoices/{invoice_id}/auto-draft-line-items", headers=auth_headers)
     assert response.status_code == 200
@@ -170,7 +170,7 @@ def test_retry_auto_draft_is_noop_when_notes_unchanged(client, auth_headers, db_
         calls.append(notes)
         return [LineItemCreate(description="Consultation fee", quantity=1, unit_price_cents=5000)]
 
-    monkeypatch.setattr("app.api.invoices.draft_line_items", fake_draft_line_items)
+    monkeypatch.setattr("app.services.invoice_drafting.draft_line_items", fake_draft_line_items)
 
     create = client.post(
         "/api/invoices",
@@ -195,7 +195,7 @@ def test_retry_auto_draft_syncs_when_notes_change_without_duplicating(
     db_session.flush()
 
     monkeypatch.setattr(
-        "app.api.invoices.draft_line_items",
+        "app.services.invoice_drafting.draft_line_items",
         lambda notes, catalog: [LineItemCreate(description="Consultation fee", quantity=1, unit_price_cents=5000)],
     )
 
@@ -218,7 +218,7 @@ def test_retry_auto_draft_syncs_when_notes_change_without_duplicating(
     db_session.flush()
 
     monkeypatch.setattr(
-        "app.api.invoices.draft_line_items",
+        "app.services.invoice_drafting.draft_line_items",
         lambda notes, catalog: [
             LineItemCreate(description="Consultation fee", quantity=1, unit_price_cents=5000),
             LineItemCreate(description="Antifungal cream", quantity=1, unit_price_cents=1500),

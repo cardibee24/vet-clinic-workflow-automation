@@ -1,8 +1,7 @@
-import logging
 import uuid
 from datetime import UTC, datetime
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
@@ -26,9 +25,9 @@ from app.schemas.invoice import (
     LineItemOut,
     LineItemUpdate,
 )
+from app.services.invoice_drafting import auto_draft_line_items, common_line_items, get_line_items
 
 router = APIRouter()
-logger = logging.getLogger(__name__)
 
 # Legal next states per current status; empty set means terminal.
 _ALLOWED_TRANSITIONS: dict[InvoiceStatus, set[InvoiceStatus]] = {
@@ -67,50 +66,6 @@ def _require_appointment_for_owner(db: Session, appointment_id: uuid.UUID, owner
     return appointment
 
 
-def _appointment_notes_text(appointment: Appointment) -> str | None:
-    sections = []
-    if appointment.visit_notes:
-        sections.append(f"Description: {appointment.visit_notes}")
-    if appointment.prescription:
-        sections.append(f"Prescription: {appointment.prescription}")
-    return "\n".join(sections) if sections else None
-
-
-def _auto_draft_line_items(db: Session, invoice: Invoice, appointment: Appointment) -> None:
-    """Best-effort: keep line items in sync with the appointment's vet notes.
-
-    Re-drafts whenever the notes text differs from what was last synced (covers
-    both the first draft and the vet adding/editing notes after the fact), and
-    skips any drafted item whose description already exists on the invoice so a
-    re-sync doesn't duplicate items that are already there. Never raises - AI
-    drafting being unavailable (missing API key, LLM error, etc.) must not block
-    invoice creation or block viewing the invoice; staff can always add line
-    items by hand.
-    """
-    notes = _appointment_notes_text(appointment)
-    if notes is None or notes == invoice.synced_vet_notes:
-        return
-    try:
-        catalog = _common_line_items(db)
-        items = draft_line_items(notes, catalog)
-    except Exception:
-        logger.exception("AI line-item drafting failed for invoice %s", invoice.id)
-        return
-
-    existing_descriptions = {item.description.strip().lower() for item in _get_line_items(db, invoice.id)}
-    for item in items:
-        if item.description.strip().lower() in existing_descriptions:
-            continue
-        db.add(InvoiceLineItem(invoice_id=invoice.id, **item.model_dump()))
-    invoice.synced_vet_notes = notes
-    db.flush()
-
-
-def _get_line_items(db: Session, invoice_id: uuid.UUID) -> list[InvoiceLineItem]:
-    stmt = select(InvoiceLineItem).where(InvoiceLineItem.invoice_id == invoice_id)
-    return list(db.execute(stmt).scalars().all())
-
-
 def _get_line_item_or_404(db: Session, invoice_id: uuid.UUID, line_item_id: uuid.UUID) -> InvoiceLineItem:
     stmt = select(InvoiceLineItem).where(
         InvoiceLineItem.id == line_item_id, InvoiceLineItem.invoice_id == invoice_id
@@ -137,17 +92,20 @@ def create_invoice(
     db.flush()
 
     if appointment is not None:
-        _auto_draft_line_items(db, invoice, appointment)
+        auto_draft_line_items(db, invoice, appointment)
 
     return invoice
 
 
 @router.get("", response_model=list[InvoiceListOut])
 def list_invoices(
+    appointment_id: uuid.UUID | None = Query(None),
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ) -> list[InvoiceListOut]:
     stmt = select(Invoice).order_by(Invoice.created_at.desc())
+    if appointment_id is not None:
+        stmt = stmt.where(Invoice.appointment_id == appointment_id)
     invoices = list(db.execute(stmt).scalars().all())
 
     totals_stmt = select(
@@ -162,36 +120,13 @@ def list_invoices(
     ]
 
 
-def _common_line_items(db: Session) -> list[CommonLineItem]:
-    stmt = select(
-        InvoiceLineItem.description,
-        InvoiceLineItem.unit_price_cents,
-        func.count().label("price_count"),
-    ).group_by(InvoiceLineItem.description, InvoiceLineItem.unit_price_cents)
-    rows = db.execute(stmt).all()
-
-    description_totals: dict[str, int] = {}
-    best_price: dict[str, tuple[int, int]] = {}  # description -> (unit_price_cents, count)
-    for description, unit_price_cents, price_count in rows:
-        description_totals[description] = description_totals.get(description, 0) + price_count
-        current = best_price.get(description)
-        if current is None or price_count > current[1]:
-            best_price[description] = (unit_price_cents, price_count)
-
-    ranked = sorted(description_totals.items(), key=lambda item: item[1], reverse=True)
-    return [
-        CommonLineItem(description=description, unit_price_cents=best_price[description][0])
-        for description, _ in ranked[:8]
-    ]
-
-
 @router.get("/common-line-items", response_model=list[CommonLineItem])
 def get_common_line_items(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ) -> list[CommonLineItem]:
     """Most frequently used line-item descriptions, with their most commonly charged price, for quick-add."""
-    return _common_line_items(db)
+    return common_line_items(db)
 
 
 @router.post("/draft-line-items", response_model=list[LineItemCreate])
@@ -205,7 +140,7 @@ def draft_line_items_endpoint(
     Nothing is saved here — review the proposals and add each one via the
     existing add-line-item endpoint.
     """
-    catalog = _common_line_items(db)
+    catalog = common_line_items(db)
     try:
         return draft_line_items(body.notes, catalog)
     except Exception as exc:
@@ -222,7 +157,7 @@ def get_invoice(
     current_user: User = Depends(get_current_user),
 ) -> InvoiceWithLineItems:
     invoice = _get_invoice_or_404(db, invoice_id)
-    line_items = _get_line_items(db, invoice.id)
+    line_items = get_line_items(db, invoice.id)
     return InvoiceWithLineItems(line_items=list(line_items), **InvoiceOut.model_validate(invoice).model_dump())
 
 
@@ -246,9 +181,9 @@ def retry_auto_draft_line_items(
             select(Appointment).where(Appointment.id == invoice.appointment_id)
         ).scalar_one_or_none()
         if appointment is not None:
-            _auto_draft_line_items(db, invoice, appointment)
+            auto_draft_line_items(db, invoice, appointment)
 
-    line_items = _get_line_items(db, invoice.id)
+    line_items = get_line_items(db, invoice.id)
     return InvoiceWithLineItems(line_items=list(line_items), **InvoiceOut.model_validate(invoice).model_dump())
 
 
@@ -328,7 +263,7 @@ def update_invoice_status(
         )
 
     if body.status == InvoiceStatus.ISSUED:
-        line_items = _get_line_items(db, invoice.id)
+        line_items = get_line_items(db, invoice.id)
         if not line_items:
             raise HTTPException(
                 status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
@@ -358,7 +293,7 @@ def delete_invoice(
 ) -> None:
     invoice = _get_invoice_or_404(db, invoice_id)
 
-    for line_item in _get_line_items(db, invoice.id):
+    for line_item in get_line_items(db, invoice.id):
         db.delete(line_item)
     db.flush()
 

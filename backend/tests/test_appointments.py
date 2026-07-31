@@ -435,6 +435,74 @@ def test_public_queue_status_not_found(client):
     assert response.status_code == 404
 
 
+def test_check_in_assigns_ticket_number(client, auth_headers, pet):
+    create = client.post(
+        "/api/appointments",
+        json={"pet_id": str(pet.id), "scheduled_at": _scheduled_at().isoformat()},
+        headers=auth_headers,
+    )
+    appointment_id = create.json()["id"]
+    assert create.json()["ticket_number"] is None
+
+    response = client.patch(
+        f"/api/appointments/{appointment_id}/status", json={"status": "checked_in"}, headers=auth_headers
+    )
+    assert response.status_code == 200
+    assert response.json()["ticket_number"] == 1
+
+
+def test_ticket_numbers_increment_across_check_ins(client, auth_headers, pet, pet2):
+    first = client.post(
+        "/api/appointments",
+        json={"pet_id": str(pet.id), "scheduled_at": _scheduled_at().isoformat()},
+        headers=auth_headers,
+    ).json()
+    second = client.post(
+        "/api/appointments",
+        json={"pet_id": str(pet2.id), "scheduled_at": _scheduled_at().isoformat()},
+        headers=auth_headers,
+    ).json()
+
+    first_checked_in = client.patch(
+        f"/api/appointments/{first['id']}/status", json={"status": "checked_in"}, headers=auth_headers
+    ).json()
+    second_checked_in = client.patch(
+        f"/api/appointments/{second['id']}/status", json={"status": "checked_in"}, headers=auth_headers
+    ).json()
+
+    assert first_checked_in["ticket_number"] == 1
+    assert second_checked_in["ticket_number"] == 2
+
+
+def test_self_check_in_assigns_ticket_number(client, pet):
+    response = client.post("/api/appointments/self-check-in", json={"pet_id": str(pet.id)})
+    assert response.json()["ticket_number"] == 1
+
+
+def test_queue_status_by_ticket_number(client, auth_headers, pet):
+    create = client.post(
+        "/api/appointments",
+        json={"pet_id": str(pet.id), "scheduled_at": _scheduled_at().isoformat()},
+        headers=auth_headers,
+    ).json()
+    checked_in = client.patch(
+        f"/api/appointments/{create['id']}/status", json={"status": "checked_in"}, headers=auth_headers
+    ).json()
+    ticket_number = checked_in["ticket_number"]
+
+    response = client.get(f"/api/appointments/ticket/{ticket_number}")
+    assert response.status_code == 200
+    body = response.json()
+    assert body["appointment_id"] == create["id"]
+    assert body["status"] == "checked_in"
+    assert body["position"] == 1
+
+
+def test_queue_status_by_ticket_number_not_found(client):
+    response = client.get("/api/appointments/ticket/999")
+    assert response.status_code == 404
+
+
 def test_delete_appointment_without_dependents_succeeds(client, auth_headers, pet):
     create = client.post(
         "/api/appointments",

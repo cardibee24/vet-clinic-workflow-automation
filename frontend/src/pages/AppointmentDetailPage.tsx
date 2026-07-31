@@ -4,6 +4,7 @@ import { useToken } from "../auth/AuthContext";
 import {
   APPOINTMENT_REASON_LABELS,
   deleteAppointment,
+  formatTicketNumber,
   updateAppointment,
   updateAppointmentNotes,
   updateAppointmentStatus,
@@ -11,6 +12,7 @@ import {
   type AppointmentStatus,
 } from "../api/appointments";
 import { useAppointmentDirectory } from "../hooks/useAppointmentDirectory";
+import { createInvoice, listInvoices } from "../api/invoices";
 import { formatDateTime, statusPillClass } from "../lib/format";
 
 const ALLOWED_TRANSITIONS: Record<AppointmentStatus, AppointmentStatus[]> = {
@@ -43,6 +45,7 @@ export function AppointmentDetailPage() {
 
   const [actionError, setActionError] = useState<string | null>(null);
   const [deleting, setDeleting] = useState(false);
+  const [billing, setBilling] = useState(false);
 
   const [editing, setEditing] = useState(false);
   const [editScheduledAt, setEditScheduledAt] = useState("");
@@ -113,6 +116,21 @@ export function AppointmentDetailPage() {
     }
   }
 
+  async function handleBillVisit() {
+    if (!appointment) return;
+    setActionError(null);
+    setBilling(true);
+    try {
+      const existing = await listInvoices(token, { appointmentId: appointment.id });
+      const invoice =
+        existing[0] ?? (await createInvoice(token, { owner_id: appointment.ownerId, appointment_id: appointment.id }));
+      navigate(`/invoices/${invoice.id}`);
+    } catch (err) {
+      setActionError(err instanceof Error ? err.message : "Failed to bill this visit");
+      setBilling(false);
+    }
+  }
+
   async function handleDelete() {
     if (!appointmentId) return;
     if (!window.confirm("Delete this appointment? This cannot be undone.")) {
@@ -152,6 +170,9 @@ export function AppointmentDetailPage() {
         <span className="muted"> &middot; {formatDateTime(appointment.scheduled_at)}</span>
         {appointment.reason && (
           <span className="muted"> &middot; {APPOINTMENT_REASON_LABELS[appointment.reason]}</span>
+        )}
+        {appointment.ticket_number !== null && (
+          <span className="muted"> &middot; ticket {formatTicketNumber(appointment.ticket_number)}</span>
         )}
       </p>
 
@@ -250,12 +271,9 @@ export function AppointmentDetailPage() {
         <Link to={`/check-queue/${appointment.id}`} target="_blank" rel="noreferrer" className="secondary">
           Queue link
         </Link>
-        <Link
-          to={`/invoices?ownerId=${appointment.ownerId}&appointmentId=${appointment.id}`}
-          className="secondary"
-        >
-          Bill this visit
-        </Link>
+        <button type="button" className="secondary" disabled={billing} onClick={handleBillVisit}>
+          {billing ? "Opening invoice..." : "Bill this visit"}
+        </button>
         <button type="button" className="secondary" disabled={deleting} onClick={handleDelete}>
           {deleting ? "Deleting..." : "Delete appointment"}
         </button>

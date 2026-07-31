@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState, type FormEvent } from "react";
-import { Link, useSearchParams } from "react-router-dom";
+import { Link } from "react-router-dom";
 import { useToken } from "../auth/AuthContext";
 import { createInvoice, deleteInvoice, listInvoices, type Invoice, type InvoiceStatus } from "../api/invoices";
 import { listOwners, type Owner } from "../api/owners";
@@ -16,7 +16,6 @@ const STATUS_LABELS: Record<InvoiceStatus, string> = {
 export function InvoicesPage() {
   const token = useToken();
   const { appointments } = useAppointmentDirectory(token);
-  const [searchParams, setSearchParams] = useSearchParams();
 
   const [invoices, setInvoices] = useState<Invoice[]>([]);
   const [owners, setOwners] = useState<Owner[]>([]);
@@ -53,22 +52,6 @@ export function InvoicesPage() {
 
   const ownersById = new Map(owners.map((owner) => [owner.id, `${owner.first_name} ${owner.last_name}`]));
   const appointmentsForOwner = appointments.filter((appointment) => appointment.ownerId === ownerId);
-
-  // Prefill from a "Bill this appointment" link (?ownerId=...&appointmentId=...) once owners have loaded.
-  useEffect(() => {
-    if (owners.length === 0) return;
-    const prefillOwnerId = searchParams.get("ownerId");
-    const prefillAppointmentId = searchParams.get("appointmentId");
-    if (!prefillOwnerId) return;
-    const owner = owners.find((o) => o.id === prefillOwnerId);
-    if (!owner) return;
-
-    setOwnerId(owner.id);
-    setOwnerQuery(`${owner.first_name} ${owner.last_name}`);
-    if (prefillAppointmentId) setAppointmentId(prefillAppointmentId);
-    setSearchParams({}, { replace: true });
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [owners]);
 
   const ownerSuggestions = useMemo(() => {
     const q = ownerQuery.trim().toLowerCase();

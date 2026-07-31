@@ -35,6 +35,7 @@ export interface Appointment {
   status: AppointmentStatus;
   reason: AppointmentReason | null;
   checked_in_at: string | null;
+  ticket_number: number | null;
   visit_notes: string | null;
   prescription: string | null;
 }
@@ -44,6 +45,7 @@ export interface QueueEntry {
   appointment_id: string;
   pet_id: string;
   checked_in_at: string | null;
+  ticket_number: number | null;
   reason: AppointmentReason | null;
 }
 
@@ -55,8 +57,14 @@ export interface QueueSummary {
 export interface AppointmentQueueStatus {
   appointment_id: string;
   status: AppointmentStatus;
+  ticket_number: number | null;
   position: number | null;
   total_waiting: number;
+}
+
+/** Formats a ticket number for display, e.g. 42 -> "Q-042". */
+export function formatTicketNumber(ticketNumber: number): string {
+  return `Q-${String(ticketNumber).padStart(3, "0")}`;
 }
 
 export interface AppointmentCreateInput {
@@ -120,6 +128,11 @@ export function getQueue(token: string): Promise<QueueSummary> {
 /** Public: no auth required, used by clients checking their own queue position. */
 export function getAppointmentQueueStatus(appointmentId: string): Promise<AppointmentQueueStatus> {
   return apiFetch(`/api/appointments/${appointmentId}/queue`);
+}
+
+/** Public: no auth required, lets a client look up their status with today's short ticket number. */
+export function getQueueStatusByTicket(ticketNumber: number): Promise<AppointmentQueueStatus> {
+  return apiFetch(`/api/appointments/ticket/${ticketNumber}`);
 }
 
 export interface SelfCheckInInput {
