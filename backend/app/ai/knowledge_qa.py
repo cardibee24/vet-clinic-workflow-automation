@@ -6,6 +6,8 @@ Generation: give the LLM the question plus the retrieved chunks and ask it to
 answer using only that context, citing which document(s) it used.
 """
 
+import logging
+
 from langchain_core.prompts import ChatPromptTemplate
 from langchain_groq import ChatGroq
 from sqlalchemy import select
@@ -15,6 +17,8 @@ from app.ai.embeddings import embed_text
 from app.config import get_settings
 from app.models.knowledge import KnowledgeChunk
 from app.schemas.knowledge import AskResponse
+
+logger = logging.getLogger(__name__)
 
 _TOP_K = 4
 
@@ -68,4 +72,10 @@ def answer_question(db: Session, question: str) -> AskResponse:
     structured_llm = llm.with_structured_output(AskResponse, method="json_mode")
 
     chain = _PROMPT | structured_llm
-    return chain.invoke({"context": context, "question": question})
+    logger.info("Calling Groq (llama-3.1-8b-instant) to answer policy question (chunks=%d)", len(chunks))
+    try:
+        response = chain.invoke({"context": context, "question": question})
+    except Exception:
+        logger.exception("Groq call failed while answering policy question")
+        raise
+    return response

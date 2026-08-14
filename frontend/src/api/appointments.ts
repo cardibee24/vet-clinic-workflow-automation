@@ -1,4 +1,5 @@
 import { apiFetch } from "./client";
+import type { Invoice } from "./invoices";
 
 export type AppointmentStatus =
   | "scheduled"
@@ -119,6 +120,11 @@ export function updateAppointmentStatus(
 
 export function deleteAppointment(token: string, appointmentId: string): Promise<void> {
   return apiFetch(`/api/appointments/${appointmentId}`, { method: "DELETE", token });
+}
+
+/** The invoice already created for this appointment (via saving vet notes), if any - 404 if none yet. */
+export function getAppointmentInvoice(token: string, appointmentId: string): Promise<Invoice> {
+  return apiFetch(`/api/appointments/${appointmentId}/invoice`, { token });
 }
 
 export function getQueue(token: string): Promise<QueueSummary> {

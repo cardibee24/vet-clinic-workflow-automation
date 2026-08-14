@@ -62,9 +62,8 @@ export interface InvoiceCreateInput {
   notes?: string;
 }
 
-export function listInvoices(token: string, params?: { appointmentId?: string }): Promise<Invoice[]> {
-  const query = params?.appointmentId ? `?appointment_id=${params.appointmentId}` : "";
-  return apiFetch(`/api/invoices${query}`, { token });
+export function listInvoices(token: string): Promise<Invoice[]> {
+  return apiFetch("/api/invoices", { token });
 }
 
 export function getCommonLineItems(token: string): Promise<CommonLineItem[]> {

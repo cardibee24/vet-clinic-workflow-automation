@@ -24,7 +24,7 @@ def triage(
     except Exception as exc:
         raise HTTPException(
             status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
-            detail="AI triage is unavailable right now. Check GOOGLE_API_KEY and try again.",
+            detail="AI triage is unavailable right now. Check GROQ_API_KEY and try again.",
         ) from exc
 
     return TriageResponse(

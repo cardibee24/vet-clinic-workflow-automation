@@ -23,7 +23,7 @@ def ask_assistant(
     except Exception as exc:
         raise HTTPException(
             status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
-            detail="AI assistant is unavailable right now. Check GOOGLE_API_KEY and try again.",
+            detail="AI assistant is unavailable right now. Check GROQ_API_KEY and try again.",
         ) from exc
 
     return AssistantResponse(intent=result["intent"] or "policy", reply=result["reply"] or "")

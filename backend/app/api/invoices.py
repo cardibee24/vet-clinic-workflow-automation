@@ -1,7 +1,7 @@
 import uuid
 from datetime import UTC, datetime
 
-from fastapi import APIRouter, Depends, HTTPException, Query, status
+from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
@@ -99,13 +99,10 @@ def create_invoice(
 
 @router.get("", response_model=list[InvoiceListOut])
 def list_invoices(
-    appointment_id: uuid.UUID | None = Query(None),
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ) -> list[InvoiceListOut]:
     stmt = select(Invoice).order_by(Invoice.created_at.desc())
-    if appointment_id is not None:
-        stmt = stmt.where(Invoice.appointment_id == appointment_id)
     invoices = list(db.execute(stmt).scalars().all())
 
     totals_stmt = select(
@@ -146,7 +143,7 @@ def draft_line_items_endpoint(
     except Exception as exc:
         raise HTTPException(
             status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
-            detail="AI drafting is unavailable right now. Check GOOGLE_API_KEY and try again.",
+            detail="AI drafting is unavailable right now. Check GROQ_API_KEY and try again.",
         ) from exc
 
 
@@ -170,7 +167,7 @@ def retry_auto_draft_line_items(
     """Sync line items with the linked appointment's current vet notes.
 
     Covers invoices created before notes were written, AI drafting being
-    unavailable at creation time (e.g. GOOGLE_API_KEY wasn't set yet), and the
+    unavailable at creation time (e.g. GROQ_API_KEY wasn't set yet), and the
     vet adding or editing notes after the invoice already has line items. A
     no-op if the invoice isn't a draft, has no linked appointment, has no
     notes, or the notes haven't changed since the last sync.

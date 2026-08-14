@@ -8,12 +8,16 @@ Nothing here is saved to the database — callers get back proposed line items
 for a human to review before adding them to a real invoice.
 """
 
+import logging
+
 from langchain_core.prompts import ChatPromptTemplate
 from langchain_groq import ChatGroq
 from pydantic import BaseModel
 
 from app.config import get_settings
 from app.schemas.invoice import CommonLineItem, LineItemCreate
+
+logger = logging.getLogger(__name__)
 
 _PROMPT = ChatPromptTemplate.from_messages(
     [
@@ -57,5 +61,11 @@ def draft_line_items(notes: str, catalog: list[CommonLineItem]) -> list[LineItem
         catalog_text = "(no price history yet)"
 
     chain = _PROMPT | structured_llm
-    result = chain.invoke({"catalog": catalog_text, "notes": notes})
+    logger.info("Calling Groq (llama-3.1-8b-instant) to draft invoice line items (notes_len=%d)", len(notes))
+    try:
+        result = chain.invoke({"catalog": catalog_text, "notes": notes})
+    except Exception:
+        logger.exception("Groq call failed while drafting invoice line items")
+        raise
+    logger.info("Drafted %d invoice line item(s)", len(result.items))
     return result.items

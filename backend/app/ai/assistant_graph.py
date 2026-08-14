@@ -24,6 +24,7 @@ real appointment, since that would need resolving an owner/pet name from
 free text first, which is a separate feature.
 """
 
+import logging
 from datetime import datetime, timedelta
 from typing import Literal, TypedDict
 
@@ -38,6 +39,8 @@ from app.ai.knowledge_qa import answer_question
 from app.ai.triage_graph import run_triage
 from app.config import get_settings
 from app.models.appointment import Appointment, AppointmentStatus
+
+logger = logging.getLogger(__name__)
 
 _SLOT_MINUTES = 30
 _BUSINESS_HOURS = (9, 17)
@@ -101,7 +104,12 @@ def _classify_intent(state: AssistantState) -> AssistantState:
     llm = ChatGroq(model="llama-3.1-8b-instant", api_key=settings.GROQ_API_KEY)
     structured_llm = llm.with_structured_output(IntentClassification, method="json_mode")
     chain = _INTENT_PROMPT | structured_llm
-    result: IntentClassification = chain.invoke({"message": state["message"]})
+    logger.info("Calling Groq (llama-3.1-8b-instant) to classify assistant intent")
+    try:
+        result: IntentClassification = chain.invoke({"message": state["message"]})
+    except Exception:
+        logger.exception("Groq call failed while classifying assistant intent")
+        raise
     return {**state, "intent": result.intent}
 
 
@@ -150,9 +158,14 @@ def build_assistant_graph(db: Session):
         llm = ChatGroq(model="llama-3.1-8b-instant", api_key=settings.GROQ_API_KEY)
         structured_llm = llm.with_structured_output(BookingExtraction, method="json_mode")
         chain = _BOOKING_PROMPT | structured_llm
-        extraction: BookingExtraction = chain.invoke(
-            {"message": state["message"], "today": datetime.now().strftime("%A, %B %d %Y")}
-        )
+        logger.info("Calling Groq (llama-3.1-8b-instant) to extract booking details")
+        try:
+            extraction: BookingExtraction = chain.invoke(
+                {"message": state["message"], "today": datetime.now().strftime("%A, %B %d %Y")}
+            )
+        except Exception:
+            logger.exception("Groq call failed while extracting booking details")
+            raise
 
         if extraction.needs_clarification or extraction.requested_datetime is None:
             reply = extraction.clarifying_question or "What date and time did you have in mind?"

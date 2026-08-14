@@ -16,6 +16,7 @@ question instead of asking the LLM to guess.
     retrieve_protocol -> decide_tier -> END
 """
 
+import logging
 from typing import TypedDict
 
 from langchain_core.prompts import ChatPromptTemplate
@@ -26,6 +27,8 @@ from sqlalchemy.orm import Session
 
 from app.ai.knowledge_qa import retrieve_chunks
 from app.config import get_settings
+
+logger = logging.getLogger(__name__)
 
 _MIN_DESCRIPTION_LENGTH = 15
 
@@ -90,7 +93,14 @@ def _decide_tier(state: TriageState) -> TriageState:
     structured_llm = llm.with_structured_output(TriageDecision, method="json_mode")
 
     chain = _PROMPT | structured_llm
-    decision: TriageDecision = chain.invoke({"protocol": state["protocol_context"], "symptoms": state["symptoms"]})
+    logger.info("Calling Groq (llama-3.1-8b-instant) to decide triage tier")
+    try:
+        decision: TriageDecision = chain.invoke(
+            {"protocol": state["protocol_context"], "symptoms": state["symptoms"]}
+        )
+    except Exception:
+        logger.exception("Groq call failed while deciding triage tier")
+        raise
 
     return {
         **state,

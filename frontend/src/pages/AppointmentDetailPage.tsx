@@ -5,14 +5,16 @@ import {
   APPOINTMENT_REASON_LABELS,
   deleteAppointment,
   formatTicketNumber,
+  getAppointmentInvoice,
   updateAppointment,
   updateAppointmentNotes,
   updateAppointmentStatus,
   type AppointmentReason,
   type AppointmentStatus,
 } from "../api/appointments";
+import { ApiError } from "../api/client";
 import { useAppointmentDirectory } from "../hooks/useAppointmentDirectory";
-import { createInvoice, listInvoices } from "../api/invoices";
+import { createInvoice } from "../api/invoices";
 import { formatDateTime, statusPillClass } from "../lib/format";
 
 const ALLOWED_TRANSITIONS: Record<AppointmentStatus, AppointmentStatus[]> = {
@@ -121,9 +123,13 @@ export function AppointmentDetailPage() {
     setActionError(null);
     setBilling(true);
     try {
-      const existing = await listInvoices(token, { appointmentId: appointment.id });
-      const invoice =
-        existing[0] ?? (await createInvoice(token, { owner_id: appointment.ownerId, appointment_id: appointment.id }));
+      let invoice;
+      try {
+        invoice = await getAppointmentInvoice(token, appointment.id);
+      } catch (err) {
+        if (!(err instanceof ApiError) || err.status !== 404) throw err;
+        invoice = await createInvoice(token, { owner_id: appointment.ownerId, appointment_id: appointment.id });
+      }
       navigate(`/invoices/${invoice.id}`);
     } catch (err) {
       setActionError(err instanceof Error ? err.message : "Failed to bill this visit");

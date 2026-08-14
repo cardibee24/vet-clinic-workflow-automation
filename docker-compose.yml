@@ -23,5 +23,30 @@ services:
       - "${REDIS_PORT:-6379}:6379"
     # Placeholder only - no Celery broker/backend wired up yet.
 
+  backend:
+    build: ./backend
+    container_name: vet-clinic-backend
+    env_file: ./backend/.env
+    environment:
+      # Overrides the .env value so the app reaches Postgres via the
+      # compose network instead of localhost.
+      DATABASE_URL: postgresql+psycopg://${POSTGRES_USER:-vetclinic}:${POSTGRES_PASSWORD:-vetclinic}@postgres:5432/${POSTGRES_DB:-vetclinic}
+    ports:
+      - "8000:8000"
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+  frontend:
+    build:
+      context: ./frontend
+      args:
+        VITE_API_BASE_URL: ""
+    container_name: vet-clinic-frontend
+    ports:
+      - "80:80"
+    depends_on:
+      - backend
+
 volumes:
   postgres_data:
